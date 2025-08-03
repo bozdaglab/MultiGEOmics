@@ -1,0 +1,7 @@
+*.pkl
+*.vscode
+*__pycache__/
+*results/
+*.bin
+*env/
+*.csv

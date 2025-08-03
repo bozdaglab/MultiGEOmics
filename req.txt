@@ -1,4 +1,5 @@
 pandas
 scikit-learn
 torch_geometric
-torch_geometric
+matplotlib
+seaborn

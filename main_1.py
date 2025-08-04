@@ -100,18 +100,19 @@ def run_model(
     early_stopping = 0
 
     for epoch in tqdm(range(args.epochs)):
-        (omics_attention_forward_train, feature_attention_forward_train) = (
-            model_train_1(
-                model=model,
-                criterion=criterion,
-                criterion1_triplet=criterion1_triplet,
-                optimizer=optimizer,
-                graph=dataset.graph,
-                label=dataset.graph.label,
-                train_data=data,
-                masking_dict=masking_dict,
-                device=device,
-            )
+        (
+            omics_attention_forward_train,
+            feature_attention_forward_train,
+        ) = model_train_1(
+            model=model,
+            criterion=criterion,
+            criterion1_triplet=criterion1_triplet,
+            optimizer=optimizer,
+            graph=dataset.graph,
+            label=dataset.graph.label,
+            train_data=data,
+            masking_dict=masking_dict,
+            device=device,
         )
 
         f1_macro_val = model_evaluate_1(
@@ -209,9 +210,9 @@ def run_1(args: Any, file_path: Path, hyperparameters: Dict) -> None:
             # ] = attention_weights_omics
             all_runs_attention_features_score[f"{rs}"] = feature_attention_forward_train
 
-            all_runs_omics[f"{rs}_omics_attention_forward_train"] = (
-                omics_attention_forward_train
-            )
+            all_runs_omics[
+                f"{rs}_omics_attention_forward_train"
+            ] = omics_attention_forward_train
 
         mrr_dictionary = defaultdict()
         for omics in define_dataset(args.dataset):

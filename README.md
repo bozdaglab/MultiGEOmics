@@ -26,7 +26,7 @@ pip install -r req.txt
 
 ### To run the code
 ```shell script
-python main_run.py --dataset=TCGA_BRCA --epochs=450 --early_stopping=150
+ python main_run.py --dataset=TCGA_GBM --epochs=450 --early_stopping=150
 ```
 
 

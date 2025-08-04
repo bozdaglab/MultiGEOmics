@@ -21,7 +21,7 @@ def load_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="AML", help="dataset name")
     parser.add_argument(
-        "--epochs", type=int, default=1, help="number of epochs to train."
+        "--epochs", type=int, default=450, help="number of epochs to train."
     )
     parser.add_argument(
         "--early_stopping", type=int, default=150, help="early stopping."

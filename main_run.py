@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from enum_holder import DataEnum
-from main_2 import run_2
 from main_1 import run_1
+from main_2 import run_2
 from model_config import load_parser
 
 args = load_parser()
@@ -29,17 +29,13 @@ if args.dataset in [
     DataEnum.PRAD.name,
     DataEnum.WT.name,
 ]:
-    run_2(args=args, 
-        file_path=file_path, 
-        hyperparameters=hyperparameters)
+    run_2(args=args, file_path=file_path, hyperparameters=hyperparameters)
 elif args.dataset in [
     DataEnum.ADNI.name,
     DataEnum.ROSMAP.name,
     DataEnum.TCGA_BRCA.name,
     DataEnum.TCGA_GBM.name,
 ]:
-    run_1(args=args, 
-        file_path=file_path, 
-        hyperparameters=hyperparameters)
+    run_1(args=args, file_path=file_path, hyperparameters=hyperparameters)
 else:
     raise ValueError

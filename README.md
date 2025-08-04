@@ -6,7 +6,7 @@ Information Flows
 
 <p align="center">
   <img 
-    src="Model_architecture_image/Architecture.png" 
+    src="image/Architecture.png" 
     alt="MultiGEOmics architecture" 
     width="800" 
   >

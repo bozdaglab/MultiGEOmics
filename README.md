@@ -3,7 +3,15 @@ MultiGEOmics: Graph-Based Integration of Multi-Omics via Biological
 Information Flows
 
 ### This repository is our PyTorch implementation of MultiGEOmics.
-![Model Architecture](Mhttps://raw.githubusercontent.com/bali-eng/MultiGEOmics/main/Model_architecture_image/Architecture.jpg)
+
+<p align="center">
+  <img 
+    src="Model_architecture_image/Architecture.jpg" 
+    alt="BioLM-NET final architecture" 
+    width="800" 
+  >
+</p>
+
 We compare MultiGEOmics with two sets of SOTA models. main_1.py from IGCN paper to run on ADNI, ROSMAP, TCGA_BRCA, TCGA_GBM datasets and main_2.py from DeepKEGG paper to run on AML, BLCA, BRCA, LIHC, PRAD, WT datasets. All the datasets have been collected from these two papers. 
 
 

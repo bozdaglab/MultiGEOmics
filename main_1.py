@@ -4,45 +4,37 @@ from copy import deepcopy
 from itertools import product
 from pathlib import Path
 from typing import Any, Dict, Tuple
-
+from pre_process_data import define_dataset
 import numpy as np
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-
+import os
 from enum_holder import DataEnum
-from helper import feature_level_attention, masking, mrr, sort_data_order
+from helper import masking, mrr, sort_data_order
 from model import MultiGraphGCN
-from model_config import RANDOM_SEEDS, TCGA_BRCA
-from pre_process_data import MultiOmicsData, ToyData
-from train_eval_IGCN import create_optimizer, model_evaluate, model_test, model_train
-
+from model_config import RANDOM_SEEDS
+from pre_process_data import MultiOmicsData
+from train_eval import create_optimizer, model_evaluate_1, model_test_1, model_train_1
 
 def run_model(
     config: Dict, args: Any, path: Path, random_state: int
 ) -> Tuple[
-    float, float, float, float, torch.Tensor, Dict[str, torch.Tensor], MultiOmicsData
+    float, torch.Tensor, Dict[str, torch.Tensor], MultiOmicsData
 ]:
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if args.dataset.islower():
         args.dataset = args.dataset.upper()
-    if args.dataset == DataEnum.toy.name:
-        dataset = ToyData(
-            path=path,
-            folder_name=args.dataset,
-            save_file=f"{args.dataset}_data.bin",
-            force_reload=True,
-        )
-    else:
-        dataset = MultiOmicsData(
-            path=path,
-            folder_name=args.dataset,
-            file_name=f"{args.dataset}_data",
-            force_reload=True,
-            similarity_metrix=config["similarity_metrix"],
-            device=device,
-        )
+
+    dataset = MultiOmicsData(
+        path=path,
+        folder_name=args.dataset,
+        file_name=f"{args.dataset}_data",
+        force_reload=True,
+        similarity_metrix=config["similarity_metrix"],
+        device=device,
+    )
 
     if args.dataset in [
         DataEnum.ADNI.name,
@@ -97,7 +89,10 @@ def run_model(
         random_state=random_state,
     )
     masking_dict = masking(
-        range_data=range_data, train_idx=train_idx, val_idx=val_idx, test_idx=test_idx
+        range_data=range_data, 
+        train_idx=train_idx, 
+        val_idx=val_idx, 
+        test_idx=test_idx
     )
     criterion = torch.nn.CrossEntropyLoss()
     criterion1_triplet = torch.nn.TripletMarginWithDistanceLoss(
@@ -108,7 +103,10 @@ def run_model(
     early_stopping = 0
 
     for epoch in tqdm(range(args.epochs)):
-        (omics_attention_forward_train, feature_attention_forward_train) = model_train(
+        (
+            omics_attention_forward_train, 
+            feature_attention_forward_train
+        ) = model_train_1(
             model=model,
             criterion=criterion,
             criterion1_triplet=criterion1_triplet,
@@ -117,9 +115,10 @@ def run_model(
             label=dataset.graph.label,
             train_data=data,
             masking_dict=masking_dict,
+            device=device
         )
 
-        f1_macro_val = model_evaluate(
+        f1_macro_val = model_evaluate_1(
             model=model,
             graph=dataset.graph,
             label=dataset.graph.label,
@@ -140,17 +139,20 @@ def run_model(
 
     model.load_state_dict(model_parameters["best_model"])
 
-    (val_accuracy, f1_test_macro, f1_test_weighted, matthews_corrcoef_test) = (
-        model_test(
-            model=model,
-            graph=dataset.graph,
-            label=dataset.graph.label,
-            data=data,
-            masking_dict=masking_dict,
-        )
+    (
+        test_accuracy,
+        f1_test_macro,
+        f1_test_weighted,
+        matthews_corrcoef_test,
+    ) = model_test_1(
+        model=model,
+        graph=dataset.graph,
+        label=dataset.graph.label,
+        data=data,
+        masking_dict=masking_dict,
     )
     return (
-        val_accuracy,
+        test_accuracy,
         f1_test_macro,
         f1_test_weighted,
         matthews_corrcoef_test,
@@ -160,8 +162,9 @@ def run_model(
     )
 
 
-def run_igcn(args, file_path: Path, hyperparameters: Dict):
-
+def run_1(args: Any, file_path: Path, hyperparameters: Dict) -> None:
+    if not os.path.exists("results"):
+        os.makedirs("results", exist_ok=True)
     combinations = list(product(*hyperparameters.values()))
     for combination in combinations:
         hyper = {
@@ -177,14 +180,14 @@ def run_igcn(args, file_path: Path, hyperparameters: Dict):
             "two_level_attention": combination[9],
         }
         all_runs_omics = defaultdict()
-        all_runs_attention_features_no_perclass = defaultdict()
+        # all_runs_attention_features_no_perclass = defaultdict()
         all_runs_attention_features_score = defaultdict()
-        all_runs = defaultdict(lambda: defaultdict(list))
+        all_runs = defaultdict(list)
+        dict_key = "_".join([str(i) for i in combination])
         for rs in RANDOM_SEEDS:
 
-            dict_key = "_".join([str(i) for i in combination])
             (
-                val_accuracy,
+                test_accuracy,
                 f1_test_macro,
                 f1_test_weighted,
                 matthews_corrcoef_test,
@@ -192,22 +195,22 @@ def run_igcn(args, file_path: Path, hyperparameters: Dict):
                 feature_attention_forward_train,
                 dataset,
             ) = run_model(config=hyper, args=args, path=file_path, random_state=rs)
-            all_runs[dict_key]["val_accuracy"].append(val_accuracy)
-            all_runs[dict_key]["f1_test_macro"].append(f1_test_macro)
-            all_runs[dict_key]["f1_test_weighted"].append(f1_test_weighted)
-            all_runs[dict_key]["matthews_corrcoef_test"].append(matthews_corrcoef_test)
+            all_runs["test_accuracy"].append(test_accuracy)
+            all_runs["f1_test_macro"].append(f1_test_macro)
+            all_runs["f1_test_weighted"].append(f1_test_weighted)
+            all_runs["matthews_corrcoef_test"].append(matthews_corrcoef_test)
 
-            attention_weights_omics = feature_level_attention(
-                weights=feature_attention_forward_train,
-                dataset=dataset.graph,
-                train_test_val="train_forward",
-                attention_types=combination[16],
-                per_class_attention=False,
-            )
+            # attention_weights_omics = feature_level_attention(
+            #     weights=feature_attention_forward_train,
+            #     dataset=dataset.graph,
+            #     train_test_val="train_forward",
+            #     attention_types="30_top",
+            #     per_class_attention=False,
+            # )
 
-            all_runs_attention_features_no_perclass[
-                f"{rs}_feature_attention_forward_train"
-            ] = attention_weights_omics
+            # all_runs_attention_features_no_perclass[
+            #     f"{rs}_feature_attention_forward_train"
+            # ] = attention_weights_omics
             all_runs_attention_features_score[f"{rs}"] = feature_attention_forward_train
 
             all_runs_omics[f"{rs}_omics_attention_forward_train"] = (
@@ -215,14 +218,14 @@ def run_igcn(args, file_path: Path, hyperparameters: Dict):
             )
 
         mrr_dictionary = defaultdict()
-        for omics in TCGA_BRCA:
+        for omics in define_dataset(args.dataset):
             mrr_dictionary[omics] = mrr(
-                all_runs_attention_features_score,
-                omics,
-                dataset.graph.features_list[omics],
+                all_runs_attention_features_score=all_runs_attention_features_score,
+                omics=omics,
+                feature_lists=dataset.graph.features_list[omics],
             )
-        with open(f"{file_path}/results/{args.dataset}_mrr.pkl", "wb") as file:
+        with open(f"results/{args.dataset}_mrr.pkl", "wb") as file:
             pickle.dump(mrr_dictionary, file)
         pd.DataFrame(all_runs).to_csv(
-            f"{file_path}/results/result_{dict_key}_{args.dataset}_{combination[16]}_perclass_{combination[18]}.csv"
+            f"results/{dict_key}_{args.dataset}.csv"
         )

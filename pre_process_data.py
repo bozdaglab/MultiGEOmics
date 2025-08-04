@@ -58,28 +58,7 @@ class MultiOmicsData(DGLDataset):
         super().__init__(name=folder_name, force_reload=force_reload)
 
     def read_data(self) -> Dict[str, Union[pd.DataFrame, torch.Tensor, Dict[str, str]]]:
-        if self.folder_name == DataEnum.TCGA_BRCA.name:
-            self.omics_type = TCGA_BRCA
-        elif self.folder_name == DataEnum.TCGA_GBM.name:
-            self.omics_type = TCGA_GBM
-        elif self.folder_name == DataEnum.ADNI.name:
-            self.omics_type = ADNI
-        elif self.folder_name == DataEnum.ROSMAP.name:
-            self.omics_type = ROSMAP
-        elif self.folder_name == DataEnum.AML.name:
-            self.omics_type = AML
-        elif self.folder_name == DataEnum.BLCA.name:
-            self.omics_type = BLCA
-        elif self.folder_name == DataEnum.BRCA.name:
-            self.omics_type = BRCA
-        elif self.folder_name == DataEnum.LIHC.name:
-            self.omics_type = LIHC
-        elif self.folder_name == DataEnum.PRAD.name:
-            self.omics_type = PRAD
-        elif self.folder_name == DataEnum.WT.name:
-            self.omics_type = WT
-        else:
-            raise ValueError
+        self.omics_type = define_dataset(folder_name=self.folder_name)
         if self.folder_name in [DataEnum.ROSMAP.name, DataEnum.TCGA_BRCA.name]:
             train_test_data = {
                 f"{omic}_{train_type}": read_omics_train_test_data_csv(
@@ -213,80 +192,30 @@ class MultiOmicsData(DGLDataset):
         return self.graph
 
 
-class ToyData(DGLDataset):
-    def __init__(self, path, folder_name, save_file, force_reload):
-        self.path = path
-        self.path_to_save = path / folder_name / save_file
-        super().__init__(name=folder_name, force_reload=force_reload)
-
-    def read_data(self):
-        self.cna = read_pickle(path=self.path, dataset=self.folder_name, name="cna")
-        self.cna_edges = read_pickle(
-            path=self.path, dataset=self.folder_name, name="edges_cna"
-        )
-        self.exp = read_pickle(path=self.path, dataset=self.folder_name, name="exp")
-        self.exp_edges = read_pickle(
-            path=self.path, dataset=self.folder_name, name="edges_exp"
-        )
-        self.label = read_pickle(
-            path=self.path, dataset=self.folder_name, name="labels"
-        )
-        self.train_mask, self.validation_mask = read_pickle(
-            path=self.path, dataset=self.folder_name, name="mask_values"
-        )
-
-    def process(self):
-        self.read_data()
-        graph_dict = {
-            ("patient", "expression", "patient"): (
-                torch.tensor(self.exp_edges["Var1"].tolist()),
-                torch.tensor(self.exp_edges["Var2"].tolist()),
-            ),
-            ("patient", "cna", "patient"): (
-                torch.tensor(self.cna_edges["Var1"].tolist()),
-                torch.tensor(self.cna_edges["Var2"].tolist()),
-            ),
-        }
-        self.graph = dgl.heterograph(graph_dict)
-        self.graph.nodes["patient"].data["expression"] = torch.from_numpy(
-            self.exp.values
-        ).float()
-        self.graph.nodes["patient"].data["cna"] = torch.from_numpy(
-            self.cna.values
-        ).float()
-        self.graph.nodes["patient"].data["train_mask"] = torch.from_numpy(
-            np.isin(range(self.exp.shape[0]), self.train_mask)
-        )
-        self.graph.nodes["patient"].data["validation_mask"] = torch.from_numpy(
-            np.isin(range(self.exp.shape[0]), self.validation_mask)
-        )
-        self.graph.label = self.label
-        self.graph.train_mask = self.train_mask
-        self.graph.validation_mask = self.validation_mask
-        self.graph.in_feats = self.graph.nodes["patient"].data["expression"].shape[1]
-        self.graph.hidden_feats = self.graph.in_feats
-        self.graph.num_patients = (
-            self.graph.nodes["patient"].data["expression"].shape[0]
-        )
-        self.graph.out_feats = int(self.graph.in_feats / 2)
-        self.graph.num_class = len(np.unique(self.label))
-
-    def save(self):
-        with open(self.path_to_save, "wb") as file:
-            pickle.dump(self.graph, file)
-        return self.graph
-
-    def load(self):
-        with open(self.path_to_save, "rb") as f:
-            self.graph = pickle.load(f)
-        return self.graph
-
-    def has_cache(self):
-        return self.path_to_save.exists()
-
-    def __getitem__(self):
-        return self.graph
-
+def define_dataset(folder_name: str) -> List[str]:
+    if folder_name == DataEnum.TCGA_BRCA.name:
+        omics_type = TCGA_BRCA
+    elif folder_name == DataEnum.TCGA_GBM.name:
+        omics_type = TCGA_GBM
+    elif folder_name == DataEnum.ADNI.name:
+        omics_type = ADNI
+    elif folder_name == DataEnum.ROSMAP.name:
+        omics_type = ROSMAP
+    elif folder_name == DataEnum.AML.name:
+        omics_type = AML
+    elif folder_name == DataEnum.BLCA.name:
+        omics_type = BLCA
+    elif folder_name == DataEnum.BRCA.name:
+        omics_type = BRCA
+    elif folder_name == DataEnum.LIHC.name:
+        omics_type = LIHC
+    elif folder_name == DataEnum.PRAD.name:
+        omics_type = PRAD
+    elif folder_name == DataEnum.WT.name:
+        omics_type = WT
+    else:
+        raise ValueError
+    return omics_type
 
 def cosine_distance_torch(
     x1: torch.Tensor, x2: Optional[Union[torch.Tensor]] = None, eps: float = 1e-8

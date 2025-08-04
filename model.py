@@ -131,9 +131,10 @@ class SemanticAttention(nn.Module):
         updated_attention_embeddings = defaultdict()
         feature_attention = defaultdict()
         for omic in h.keys():
-            updated_attention_embeddings[omic], feature_attention[omic] = (
-                self.feature_attn_modules[omic](h[omic])
-            )
+            (
+                updated_attention_embeddings[omic],
+                feature_attention[omic],
+            ) = self.feature_attn_modules[omic](h[omic])
 
         if self.dataset in [
             DataEnum.ADNI.name,
@@ -314,10 +315,9 @@ class MultiGraphGCN(nn.Module):
             device=device,
         )
 
-        if stack_types == "stack":
-            self.lin_transpose = nn.Linear(
-                sum([val[1] for val in self.omics_shapes.values()]), hid_emb
-            )
+        self.lin_transpose = nn.Linear(
+            sum([val[1] for val in self.omics_shapes.values()]), hid_emb
+        )
 
     def correct_shape(
         self, embeddings: Dict[str, torch.Tensor]
@@ -335,9 +335,11 @@ class MultiGraphGCN(nn.Module):
             key: self.conv1[key](graph[key], value) for key, value in input_data.items()
         }
         embeddings = self.correct_shape(embeddings)
-        first_hop_embeddings, omics_attention, feature_attention = (
-            self.attentionencoder(embeddings)
-        )
+        (
+            first_hop_embeddings,
+            omics_attention,
+            feature_attention,
+        ) = self.attentionencoder(embeddings)
 
         second_hop_embeddings = {
             etyoe: self.conv2[etyoe](graph[etyoe], first_hop_embeddings[etyoe])
@@ -363,9 +365,11 @@ class MultiGraphGCN(nn.Module):
     def forward(
         self, graph: DGLHeteroGraph, input_data: Dict[str, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Dict[str, torch.Tensor]]:
-        second_hop_embeddings, omics_attention_forward, feature_attention_forward = (
-            self.message_passings_embeddings(graph, input_data)
-        )
+        (
+            second_hop_embeddings,
+            omics_attention_forward,
+            feature_attention_forward,
+        ) = self.message_passings_embeddings(graph, input_data)
         if self.reverse_attention:
             reverse_input_data = sort_data_order(
                 args=self.args, train_data=input_data, forwards=False
@@ -389,14 +393,9 @@ class MultiGraphGCN(nn.Module):
             second_hop_embeddings = list(second_hop_embeddings.values())
         elif isinstance(second_hop_embeddings, Tensor):
             second_hop_embeddings = list(second_hop_embeddings)
-        if self.stack_types == "stack":
-            out_embeddings = self.lin_transpose(
-                torch.concat(second_hop_embeddings, dim=-1)
-            )
-        elif self.stack_types == "mean":
-            out_embeddings = torch.concat(second_hop_embeddings, dim=-1)
-        elif self.stack_types == "sum":
-            out_embeddings = sum(second_hop_embeddings)
+        out_embeddings = self.lin_transpose(
+            torch.concat(second_hop_embeddings, dim=-1)
+        )
         return (
             out_embeddings,
             self.label_classifier(out_embeddings),

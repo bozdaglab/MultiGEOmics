@@ -11,7 +11,6 @@ class DataEnum(Enum):
     ROSMAP = auto()
     TCGA_BRCA = auto()
     TCGA_GBM = auto()
-    toy = auto()
     WT = auto()
 
 

@@ -6,8 +6,8 @@ Information Flows
 
 <p align="center">
   <img 
-    src="Model_architecture_image/Architecture.jpg" 
-    alt="BioLM-NET final architecture" 
+    src="Model_architecture_image/Architecture.png" 
+    alt="MultiGEOmics architecture" 
     width="800" 
   >
 </p>

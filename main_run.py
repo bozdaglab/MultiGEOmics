@@ -30,8 +30,8 @@ if args.dataset in [
     DataEnum.WT.name,
 ]:
     run_2(args=args, 
-          file_path=file_path, 
-          hyperparameters=hyperparameters)
+        file_path=file_path, 
+        hyperparameters=hyperparameters)
 elif args.dataset in [
     DataEnum.ADNI.name,
     DataEnum.ROSMAP.name,
@@ -39,7 +39,7 @@ elif args.dataset in [
     DataEnum.TCGA_GBM.name,
 ]:
     run_1(args=args, 
-          file_path=file_path, 
-          hyperparameters=hyperparameters)
+        file_path=file_path, 
+        hyperparameters=hyperparameters)
 else:
     raise ValueError

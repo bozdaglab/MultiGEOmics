@@ -14,6 +14,7 @@ WT = ["miRNA", "mRNA"]
 RANDOM_SEED = 1030
 RANDOM_SEEDS = [3, 12, 26, 39, 44, 64, 66, 75, 87, 91]
 MASKING = ["train_idx", "val_idx", "test_idx"]
+ADNI_ORDER = [["snps", "bile"], ["snps", "lipids"]]
 
 
 def load_parser():

@@ -23,7 +23,6 @@ from helper import (
     read_omics_data_csv,
     read_omics_data_pkl,
     read_omics_train_test_data_csv,
-    read_pickle,
     read_pkl,
 )
 from model_config import (
@@ -145,7 +144,7 @@ class MultiOmicsData(DGLDataset):
         }
 
         graph_dict = {
-            (f"patient", f"{omic}", f"patient"): (
+            ("patient", f"{omic}", "patient"): (
                 edge_train_test_data[f"edges_{omic}"][0],
                 edge_train_test_data[f"edges_{omic}"][1],
             )
@@ -154,7 +153,7 @@ class MultiOmicsData(DGLDataset):
 
         self.graph = dgl.heterograph(graph_dict).to(self.device)
         for omic in self.omics_type:
-            self.graph.nodes[f"patient"].data[f"{omic}"] = (
+            self.graph.nodes["patient"].data[f"{omic}"] = (
                 torch.from_numpy(train_test_data[f"{omic}"].values)
                 .float()
                 .to(self.device)
@@ -216,6 +215,7 @@ def define_dataset(folder_name: str) -> List[str]:
     else:
         raise ValueError
     return omics_type
+
 
 def cosine_distance_torch(
     x1: torch.Tensor, x2: Optional[Union[torch.Tensor]] = None, eps: float = 1e-8

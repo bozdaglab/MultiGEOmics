@@ -1,13 +1,11 @@
+import logging
 import random
-from collections import defaultdict
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import torch
 from dgl.heterograph import DGLHeteroGraph
 from sklearn.metrics import (
-    f1_score, 
-    matthews_corrcoef,
     auc,
     average_precision_score,
     f1_score,
@@ -20,8 +18,9 @@ from sklearn.metrics import (
 from torch import optim
 from torch.nn.modules.loss import CrossEntropyLoss, TripletMarginWithDistanceLoss
 from torch.optim import Optimizer
+
 from model import MultiGraphGCN
-import logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -102,7 +101,7 @@ def model_train_1(
     label: torch.Tensor,
     train_data: Dict[str, torch.Tensor],
     masking_dict: Dict[str, torch.Tensor],
-    device: torch.device
+    device: torch.device,
 ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
     model.train()
     optimizer.zero_grad()
@@ -113,12 +112,12 @@ def model_train_1(
     pred_train = pred[masking_dict["train_idx"]]
     loss = calculate_loss(label=label_train, pred=pred_train, criterion=criterion)
     additional_loss = triplet_loss(
-        label=label, 
-        out=embeddings, 
-        criterion1_triplet=criterion1_triplet, 
-        masking_dict=masking_dict, 
+        label=label,
+        out=embeddings,
+        criterion1_triplet=criterion1_triplet,
+        masking_dict=masking_dict,
         train_test="train_idx",
-        device=device
+        device=device,
     )
     loss += additional_loss
     loss.backward()
@@ -185,7 +184,6 @@ def model_test_1(
     return text_accuracy.item(), f1_test_macro, f1_test_weighted, matthews_corrcoef_test
 
 
-
 def model_train_2(
     model: MultiGraphGCN,
     criterion: CrossEntropyLoss,
@@ -196,7 +194,7 @@ def model_train_2(
     train_data: Dict[str, torch.Tensor],
     masking_dict: Dict[str, torch.Tensor],
     device: torch.device,
-) -> Tuple[float, torch.Tensor, Dict[str, torch.Tensor]]:
+) -> float:
     model.train()
     optimizer.zero_grad()
     embeddings, pred, omics_attention_forward, feature_attention_forward = model(
@@ -206,12 +204,12 @@ def model_train_2(
     pred_train = pred[masking_dict["train_idx"]]
     loss = calculate_loss(label=label_train, pred=pred_train, criterion=criterion)
     additional_loss = triplet_loss(
-        label=label, 
-        out=embeddings, 
-        criterion1_triplet=criterion1_triplet, 
-        masking_dict=masking_dict, 
-        train_test="train_idx", 
-        device=device
+        label=label,
+        out=embeddings,
+        criterion1_triplet=criterion1_triplet,
+        masking_dict=masking_dict,
+        train_test="train_idx",
+        device=device,
     )
     loss += additional_loss
     loss.backward()
@@ -241,8 +239,7 @@ def model_train_2(
         f"Train loss:{loss:.4f}, Train accuracy:{accuracy:.4f}, f1_macro:{f1_macro:.4f}, f1_weighted:{f1_weighted:.4f},\n"
         f"matthews_corrcoef_:{matthews_corrcoef_:.4f}, aupr:{aupr:.4f}, auc:{auc_res:.4f}, f1:{f1:.4f}, auprc:{auprc:.4f}, pre:{pre_res:.4f}"
     )
-    return f1_macro, omics_attention_forward, feature_attention_forward
-
+    return f1_macro  # , omics_attention_forward, feature_attention_forward
 
 
 @torch.no_grad()
@@ -277,9 +274,6 @@ def model_evaluate_2(
     return f1_macro, omics_attention_forward, feature_attention_forward
 
 
-
-
-
 @torch.no_grad()
 def model_test_2(
     model: MultiGraphGCN,
@@ -289,9 +283,7 @@ def model_test_2(
     masking_dict: Dict[str, torch.Tensor],
 ) -> Tuple[float]:
     model.eval()
-    _, pred, _, _ = model(
-        graph=graph, input_data=data
-    )
+    _, pred, _, _ = model(graph=graph, input_data=data)
     test_idx = masking_dict["test_idx"]
     label_test = label[test_idx]
     pred_logits_test = pred[test_idx]
@@ -303,9 +295,7 @@ def model_test_2(
     pre_res = precision_score(label_test.cpu(), pred_test.cpu())
     rec_res = recall_score(label_test.cpu(), pred_test.cpu())
     matthews_corrcoef_test = matthews_corrcoef(label_test.cpu(), pred_test.cpu())
-    probs_class1 = pred_logits_test[
-        :, 1
-    ].cpu()
+    probs_class1 = pred_logits_test[:, 1].cpu()
     fpr, tpr, _ = roc_curve(label_test.cpu(), probs_class1)
     auc_res = auc(fpr, tpr)
     pre_curve, rec_curve, _ = precision_recall_curve(label_test.cpu(), probs_class1)

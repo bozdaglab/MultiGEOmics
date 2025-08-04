@@ -1,7 +1,10 @@
+import logging
 from collections import defaultdict
 from copy import deepcopy
 from itertools import product
-from model_config import RANDOM_SEED
+from pathlib import Path
+from typing import Any, Dict
+
 import numpy as np
 import pandas as pd
 import torch
@@ -11,18 +14,18 @@ from tqdm import tqdm
 from enum_holder import DataEnum
 from helper import masking, sort_data_order
 from model import MultiGraphGCN
+from model_config import RANDOM_SEED
 from pre_process_data import MultiOmicsData
 from train_eval import create_optimizer, model_test_2, model_train_2
-from pathlib import Path
-from typing import Any, Dict
-import logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 def run_model(
     config: Dict, args: Any, path: Path, random_state: int
 ) -> Dict[str, torch.Tensor]:
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if args.dataset.islower():
         args.dataset = args.dataset.upper()
@@ -37,18 +40,12 @@ def run_model(
     )
 
     if args.dataset in [
-        DataEnum.ADNI.name,
-        DataEnum.TCGA_GBM.name,
-        DataEnum.AML.name,
-        DataEnum.BLCA.name,
-        DataEnum.BRCA.name,
-        DataEnum.LIHC.name,
-        DataEnum.PRAD.name,
-        DataEnum.WT.name,
+        DataEnum.ROSMAP.name,
+        DataEnum.TCGA_BRCA.name,
     ]:
-        hidden_feats = [i[1] for k, i in dataset.graph.shape.items() if len(i) > 1]
-    else:
         hidden_feats = dataset.graph.shape[0][1]
+    else:
+        hidden_feats = [i[1] for k, i in dataset.graph.shape.items() if len(i) > 1]
 
     model = MultiGraphGCN(
         hid_emb=config["hidden_embeedings"],
@@ -91,11 +88,7 @@ def run_model(
         early_stopping = 0
 
         for _ in tqdm(range(args.epochs)):
-            (
-                f1_macro,
-                omics_attention_forward_train,
-                feature_attention_forward_train,
-            ) = model_train_2(
+            f1_macro = model_train_2(
                 model=model,
                 criterion=criterion,
                 criterion1_triplet=criterion1_triplet,
@@ -110,8 +103,6 @@ def run_model(
             if f1_macro >= best_f1_macro_val:
                 best_f1_macro_val = f1_macro
                 model_parameters = {"best_model": deepcopy(model.state_dict())}
-                fin_omics_attention_forward_train = omics_attention_forward_train
-                fin_feature_attention_forward_train = feature_attention_forward_train
                 early_stopping = 0
             else:
                 early_stopping += 1
@@ -175,7 +166,7 @@ def run_2(args: Any, file_path: Path, hyperparameters: Dict) -> None:
         )
         pd.DataFrame(all_runs).to_csv(f"results/{dict_key}_{args.dataset}.csv")
     logger.info(
-        f'final_accuracy{np.mean(all_runs["val_accuracy"])},\n'
+        f'final_accuracy{np.mean(all_runs["test_accuracy"])},\n'
         f'f1_test_macro:{np.mean(all_runs["f1_test_macro"])},\n'
         f'f1_test_weighted:{np.mean(all_runs["f1_test_weighted"])},\n'
         f'matthews_corrcoef_test:{np.mean(all_runs["matthews_corrcoef_test"])}'

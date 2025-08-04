@@ -1,28 +1,28 @@
+import os
 import pickle
 from collections import defaultdict
 from copy import deepcopy
 from itertools import product
 from pathlib import Path
 from typing import Any, Dict, Tuple
-from pre_process_data import define_dataset
+
 import numpy as np
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-import os
+
 from enum_holder import DataEnum
 from helper import masking, mrr, sort_data_order
 from model import MultiGraphGCN
 from model_config import RANDOM_SEEDS
-from pre_process_data import MultiOmicsData
+from pre_process_data import MultiOmicsData, define_dataset
 from train_eval import create_optimizer, model_evaluate_1, model_test_1, model_train_1
+
 
 def run_model(
     config: Dict, args: Any, path: Path, random_state: int
-) -> Tuple[
-    float, torch.Tensor, Dict[str, torch.Tensor], MultiOmicsData
-]:
+) -> Tuple[float, torch.Tensor, Dict[str, torch.Tensor], MultiOmicsData]:
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if args.dataset.islower():
         args.dataset = args.dataset.upper()
@@ -89,10 +89,7 @@ def run_model(
         random_state=random_state,
     )
     masking_dict = masking(
-        range_data=range_data, 
-        train_idx=train_idx, 
-        val_idx=val_idx, 
-        test_idx=test_idx
+        range_data=range_data, train_idx=train_idx, val_idx=val_idx, test_idx=test_idx
     )
     criterion = torch.nn.CrossEntropyLoss()
     criterion1_triplet = torch.nn.TripletMarginWithDistanceLoss(
@@ -103,19 +100,18 @@ def run_model(
     early_stopping = 0
 
     for epoch in tqdm(range(args.epochs)):
-        (
-            omics_attention_forward_train, 
-            feature_attention_forward_train
-        ) = model_train_1(
-            model=model,
-            criterion=criterion,
-            criterion1_triplet=criterion1_triplet,
-            optimizer=optimizer,
-            graph=dataset.graph,
-            label=dataset.graph.label,
-            train_data=data,
-            masking_dict=masking_dict,
-            device=device
+        (omics_attention_forward_train, feature_attention_forward_train) = (
+            model_train_1(
+                model=model,
+                criterion=criterion,
+                criterion1_triplet=criterion1_triplet,
+                optimizer=optimizer,
+                graph=dataset.graph,
+                label=dataset.graph.label,
+                train_data=data,
+                masking_dict=masking_dict,
+                device=device,
+            )
         )
 
         f1_macro_val = model_evaluate_1(
@@ -226,6 +222,4 @@ def run_1(args: Any, file_path: Path, hyperparameters: Dict) -> None:
             )
         with open(f"results/{args.dataset}_mrr.pkl", "wb") as file:
             pickle.dump(mrr_dictionary, file)
-        pd.DataFrame(all_runs).to_csv(
-            f"results/{dict_key}_{args.dataset}.csv"
-        )
+        pd.DataFrame(all_runs).to_csv(f"results/{dict_key}_{args.dataset}.csv")

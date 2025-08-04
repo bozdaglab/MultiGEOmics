@@ -1,8 +1,7 @@
-import os
 import pickle
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Union, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -22,12 +21,6 @@ from model_config import (
     TCGA_GBM,
     WT,
 )
-
-
-def read_pickle(path: Path, dataset: str, name: str):
-    with open(f"{path}/{dataset}/{name}.pkl", "rb") as f:
-        pickle_file = pickle.load(f)
-    return pickle_file
 
 
 def read_csv(path: Path, dataset: str, name: str) -> Union[torch.Tensor, pd.DataFrame]:
@@ -125,21 +118,19 @@ def sort_data_order(
 
 
 def mrr(
-        all_runs_attention_features_score: Dict[int, Dict[str, torch.Tensor]], 
-        omics: str, 
-        feature_lists: List[str]
-)-> Tuple[torch.Tensor, List[str]]:
+    all_runs_attention_features_score: Dict[int, Dict[str, torch.Tensor]],
+    omics: str,
+    feature_lists: List[str],
+) -> Tuple[torch.Tensor, List[str]]:
     attention_stack = torch.stack(
         [value[omics] for k, value in all_runs_attention_features_score.items()]
     )
     feature_scores = attention_stack.mean(dim=1)
 
-    def compute_ranks(scores: torch.Tensor)-> torch.Tensor:
+    def compute_ranks(scores: torch.Tensor) -> torch.Tensor:
         return torch.argsort(torch.argsort(-scores)) + 1
 
-    ranks = torch.stack(
-        [compute_ranks(row) for row in feature_scores]
-    )
+    ranks = torch.stack([compute_ranks(row) for row in feature_scores])
     mrr_per_feature = (1.0 / ranks.float()).mean(dim=0)
     sorted_mrr, sorted_indices = torch.sort(mrr_per_feature, descending=True)
     top_mrr_features = []

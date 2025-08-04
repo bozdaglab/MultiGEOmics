@@ -11,6 +11,7 @@ from torch import Tensor
 
 from enum_holder import DataEnum
 from helper import sort_data_order
+from model_config import ADNI_ORDER
 
 
 class FeatureAttention(nn.Module):
@@ -136,88 +137,7 @@ class SemanticAttention(nn.Module):
                 feature_attention[omic],
             ) = self.feature_attn_modules[omic](h[omic])
 
-        if self.dataset in [
-            DataEnum.ADNI.name,
-            DataEnum.TCGA_GBM.name,
-            DataEnum.TCGA_BRCA.name,
-            DataEnum.AML.name,
-            DataEnum.BLCA.name,
-            DataEnum.BRCA.name,
-            DataEnum.LIHC.name,
-            DataEnum.PRAD.name,
-            DataEnum.WT.name,
-        ]:
-            omics_att = torch.stack(
-                list(
-                    {
-                        key: torch.sigmoid(
-                            torch.matmul(value, self.weights_s1[key].to(self.device))
-                        )
-                        for key, value in updated_attention_embeddings.items()
-                    }.values()
-                )
-            )
-            omics_attention = F.softmax(
-                torch.matmul(omics_att, self.weights_s2), dim=1
-            ).permute(0, 2, 1, 3)
-            omics_attention = self.dropout(omics_attention)
-            updated_embed = {
-                key: value.unsqueeze(1) * omics_attention[idx]
-                for idx, (key, value) in enumerate(updated_attention_embeddings.items())
-            }
-            keys = list(h.keys())
-            idx = 1
-            if self.dataset in DataEnum.ADNI.name:
-                encoder_inp = updated_embed["snps"].permute(0, 2, 1)
-                decoder_inp = updated_embed["bile"].permute(0, 2, 1)
-                Q = self.split_heads(decoder_inp)
-                K = self.split_heads(encoder_inp)
-                V = self.split_heads(encoder_inp)
-                attn_output, attn_scores = self.scaled_dot_product_attention(
-                    Q, K, V, mask=None
-                )
-                output = self.combine_heads(attn_output)
-                final_output = self.norms["bile"](
-                    self.dropout(output.squeeze(-1)).to(self.device)
-                    + decoder_inp.squeeze(-1).to(self.device)
-                )
-                updated_attention_embeddings["bile"] = final_output
-                feature_attention[f"snps_bile"] = attn_scores
-
-                encoder_inp = updated_embed["snps"].permute(0, 2, 1)
-                decoder_inp = updated_embed["lipids"].permute(0, 2, 1)
-                Q = self.split_heads(decoder_inp)
-                K = self.split_heads(encoder_inp)
-                V = self.split_heads(encoder_inp)
-                attn_output, attn_scores = self.scaled_dot_product_attention(
-                    Q, K, V, mask=None
-                )
-                output = self.combine_heads(attn_output)
-                final_output = self.norms["lipids"](
-                    self.dropout(output.squeeze(-1)).to(self.device)
-                    + decoder_inp.squeeze(-1).to(self.device)
-                )
-                updated_attention_embeddings["lipids"] = final_output
-                feature_attention[f"snps_lipids"] = attn_scores
-            else:
-                while idx < len(updated_embed):
-                    encoder_inp = updated_embed[keys[idx - 1]].permute(0, 2, 1)
-                    decoder_inp = updated_embed[keys[idx]].permute(0, 2, 1)
-                    Q = self.split_heads(decoder_inp)
-                    K = self.split_heads(encoder_inp)
-                    V = self.split_heads(encoder_inp)
-                    attn_output, attn_scores = self.scaled_dot_product_attention(
-                        Q, K, V, mask=None
-                    )
-                    output = self.combine_heads(attn_output)
-                    final_output = self.norms[keys[idx]](
-                        self.dropout(output.squeeze(-1)).to(self.device)
-                        + decoder_inp.squeeze(-1).to(self.device)
-                    )
-                    updated_attention_embeddings[keys[idx]] = final_output
-                    feature_attention[f"{keys[idx - 1]}_{keys[idx]}"] = attn_scores
-                    idx += 1
-        else:
+        if self.dataset == DataEnum.ROSMAP.name:
             stacked_embeddings = torch.stack(
                 list(updated_attention_embeddings.values())
             )
@@ -245,6 +165,64 @@ class SemanticAttention(nn.Module):
                 )
                 output = self.combine_heads(attn_output)
                 final_output = self.norm(self.dropout(output.squeeze(-1)) + decoder_inp)
+                updated_attention_embeddings[keys[idx]] = final_output
+                feature_attention[f"{keys[idx - 1]}_{keys[idx]}"] = attn_scores
+                idx += 1
+
+        else:
+            omics_att = torch.stack(
+                list(
+                    {
+                        key: torch.sigmoid(
+                            torch.matmul(value, self.weights_s1[key].to(self.device))
+                        )
+                        for key, value in updated_attention_embeddings.items()
+                    }.values()
+                )
+            )
+            omics_attention = F.softmax(
+                torch.matmul(omics_att, self.weights_s2), dim=1
+            ).permute(0, 2, 1, 3)
+            omics_attention = self.dropout(omics_attention)
+            updated_embed = {
+                key: value.unsqueeze(1) * omics_attention[idx]
+                for idx, (key, value) in enumerate(updated_attention_embeddings.items())
+            }
+
+            if self.dataset == DataEnum.ADNI.name:
+                for omics_type in ADNI_ORDER:
+                    encoder_inp = updated_embed[omics_type[0]].permute(0, 2, 1)
+                    decoder_inp = updated_embed[omics_type[1]].permute(0, 2, 1)
+                    Q = self.split_heads(decoder_inp)
+                    K = self.split_heads(encoder_inp)
+                    V = self.split_heads(encoder_inp)
+                    attn_output, attn_scores = self.scaled_dot_product_attention(
+                        Q, K, V, mask=None
+                    )
+                    output = self.combine_heads(attn_output)
+                    final_output = self.norms[omics_type[0]](
+                        self.dropout(output.squeeze(-1)).to(self.device)
+                        + decoder_inp.squeeze(-1).to(self.device)
+                    )
+                    updated_attention_embeddings[omics_type[0]] = final_output
+                    feature_attention[f"{omics_type[0]}_{omics_type[1]}"] = attn_scores
+
+            keys = list(h.keys())
+            idx = 1
+            while idx < len(updated_embed):
+                encoder_inp = updated_embed[keys[idx - 1]].permute(0, 2, 1)
+                decoder_inp = updated_embed[keys[idx]].permute(0, 2, 1)
+                Q = self.split_heads(decoder_inp)
+                K = self.split_heads(encoder_inp)
+                V = self.split_heads(encoder_inp)
+                attn_output, attn_scores = self.scaled_dot_product_attention(
+                    Q, K, V, mask=None
+                )
+                output = self.combine_heads(attn_output)
+                final_output = self.norms[keys[idx]](
+                    self.dropout(output.squeeze(-1)).to(self.device)
+                    + decoder_inp.squeeze(-1).to(self.device)
+                )
                 updated_attention_embeddings[keys[idx]] = final_output
                 feature_attention[f"{keys[idx - 1]}_{keys[idx]}"] = attn_scores
                 idx += 1
@@ -393,9 +371,7 @@ class MultiGraphGCN(nn.Module):
             second_hop_embeddings = list(second_hop_embeddings.values())
         elif isinstance(second_hop_embeddings, Tensor):
             second_hop_embeddings = list(second_hop_embeddings)
-        out_embeddings = self.lin_transpose(
-            torch.concat(second_hop_embeddings, dim=-1)
-        )
+        out_embeddings = self.lin_transpose(torch.concat(second_hop_embeddings, dim=-1))
         return (
             out_embeddings,
             self.label_classifier(out_embeddings),

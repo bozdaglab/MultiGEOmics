@@ -33,9 +33,37 @@ pip install -r req.txt
 ```
 
 
+## How to run MultiGEOmics
+## 1. Dataset Location
+Place all input files in the dataset/ directory.
+## 2. Supported File Formats
+The current implementation supports input files in .csv or .pkl format.
+Option 1: CSV Format
+dataset/
+└── TCGA_BRCA/
+    ├── meth.csv
+    ├── mirna.csv
+    ├── expression.csv
+    └── labels.csv
+
+Option 2: Pickle Format 
+dataset/
+└── TCGA_GBM/
+    ├── mirna.pkl
+    ├── expression.pkl
+    └── labels.pkl
+
+## 3. File Naming Convention and Omics Order
+The files must be named based on omics type: mirna.csv, expression.pkl, etc.
+These names must exactly match the entries in model_config.py.
+
+TCGA_BRCA = ["meth", "mirna", "expression"]
+
+
 ### To run the code
 ```shell script
  python main_run.py --dataset=TCGA_GBM --epochs=450 --early_stopping=150
 ```
+Here TCGA_GBM is the name of the dataset.
 
 

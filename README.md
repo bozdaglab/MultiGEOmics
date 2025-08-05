@@ -59,11 +59,11 @@ dataset/
     └── labels.pkl
 ```
 ### 3. File Naming Convention and Omics Order
-The dataset files must be named based on the omics types, and their names (excluding file extensions) should exactly match the entries in **`model_config.py`**.  Here are some example dataset configurations:
+The dataset files must be named based on the omics types, and their names (excluding file extensions) should exactly match the entries in **`model_config.py`**.  Here is an example:
 ```text
 TCGA_BRCA = ["meth", "mirna", "expression"]
 ```
-This represents the flow of data types from meth (methylation) to mirna (miRNA) and then to expression (mRNA).
+This represents the flow of omics types in TCGA_BRCA from meth (methylation) to mirna (miRNA) and then to expression (mRNA).
 
 ### To run the code
 ```shell script

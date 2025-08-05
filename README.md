@@ -35,11 +35,11 @@ pip install -r req.txt
 
 ## How to run MultiGEOmics
 ### 1. Dataset Location
-Place all input files in the dataset/ directory.
+All datasets should be placed inside the **`dataset/`** directory
 ### 2. Supported File Formats
-The current implementation supports input files in .csv or .pkl format.
+The current implementation supports input files in two formats.
 
-Option 1: CSV Format
+#### Option 1: CSV Format
 
 ```text
 dataset/
@@ -49,7 +49,7 @@ dataset/
     ├── expression.csv
     └── labels.csv
 ```
-Option 2: Pickle Format 
+#### Option 2: Pickle Format 
 
 ```text
 dataset/

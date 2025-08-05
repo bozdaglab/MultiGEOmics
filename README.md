@@ -71,4 +71,7 @@ This represents the flow of omics types in TCGA_BRCA from meth (methylation) to 
 ```
 In the examples above, **`TCGA_GBM`** refers to the name of the dataset (**`dataset/TCGA_GBM/`**).
 
+##### The supplemental document is available in the supplementary folder.
+
+
 

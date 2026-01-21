@@ -75,3 +75,17 @@ In the examples above, **`TCGA_GBM`** refers to the name of the dataset (**`data
 
 
 
+
+
+
+
+####
+cross omics top 10 or 0.01 percent 
+    do the enrichment
+    do sankey plot
+    do the cascade 
+complete the imputatiuon part 
+    0,0 and last dataset
+10 percent of the data
+    sanky plot self attention
+    GO/KEGG

@@ -4,7 +4,7 @@ from collections import defaultdict
 from itertools import islice, product
 from pathlib import Path
 from typing import Dict, List, Optional, Union
-
+from numpy.typing import NDArray
 import dgl
 import numpy as np
 import pandas as pd
@@ -109,7 +109,7 @@ class MultiOmicsData(DGLDataset):
             DataEnum.ROSMAP_M.name,
             DataEnum.LGG.name,
         ]:
-            train_test_data = self.prepare_trte_data(self.path / self.folder_name)
+            train_test_data = self.prepare_clclsa_data(self.path / self.folder_name)
         else:
             train_test_data = {
                 f"{omic}": read_omics_data_pkl(
@@ -203,8 +203,7 @@ class MultiOmicsData(DGLDataset):
         ].shape[0]
         self.graph.num_class = len(torch.unique(self.graph.label))
 
-    def prepare_trte_data(self, path, cuda=True):
-        omics_type = ["meth", "mirna", "expression"]
+    def prepare_clclsa_data(self, path: Path) -> Dict[str, Union[NDArray[np.generic], Dict[str, List[int]]]]:
         labels_tr = np.loadtxt(os.path.join(path, "labels_tr.csv"), delimiter=",")
         labels_te = np.loadtxt(os.path.join(path, "labels_te.csv"), delimiter=",")
         labels_tr = labels_tr.astype(int)
@@ -212,7 +211,7 @@ class MultiOmicsData(DGLDataset):
         data_tr_list = defaultdict()
         data_te_list = defaultdict()
 
-        for i in omics_type:
+        for i in self.omics_type:
             data_tr_list[i] = np.loadtxt(
                 os.path.join(path, str(i) + "_train.csv"), delimiter=","
             )
@@ -251,7 +250,7 @@ class MultiOmicsData(DGLDataset):
         num_tr = data_tr_list["meth"].shape[0]
         num_te = data_te_list["meth"].shape[0]
         train_test_data = defaultdict()
-        for i in omics_type:
+        for i in self.omics_type:
             train_test_data[i] = np.concatenate(
                 (data_tr_list[i], data_te_list[i]), axis=0
             )
@@ -439,11 +438,13 @@ def define_graph(similarity_type: str, data: pd.DataFrame) -> torch.Tensor:
     return similarity_matrix
 
 
-def get_mask_wrapper(n_views, data_len, missing_rate):
+def get_mask_wrapper(n_views: int, data_len: int, missing_rate: float) -> NDArray[np.float64]:
     success = False
     while not success:
         try:
-            mask = get_mask(n_views, data_len, missing_rate)
+            mask = get_mask(view_num=n_views, 
+                            alldata_len=data_len, 
+                            missing_rate=missing_rate)
             success = True
         except:
             success = False
@@ -457,7 +458,7 @@ def one_hot_tensor(y, num_dim):
     return y_onehot
 
 
-def get_mask(view_num, alldata_len, missing_rate):
+def get_mask(view_num: int, alldata_len: int, missing_rate: float) -> NDArray[np.float64]:
     """
     Randomly generate incomplete data information, simulate partial view data with complete view data
     :param view_num:view number
@@ -468,7 +469,7 @@ def get_mask(view_num, alldata_len, missing_rate):
     full_matrix = np.ones((int(alldata_len * (1 - missing_rate)), view_num))
 
     alldata_len = alldata_len - int(alldata_len * (1 - missing_rate))
-    # missing_rate = 0.5
+
     if alldata_len != 0:
         one_rate = 1.0 - missing_rate
         if one_rate <= (1 / view_num):
@@ -492,7 +493,7 @@ def get_mask(view_num, alldata_len, missing_rate):
             matrix = full_matrix[choice]
             return matrix
         while error >= 0.05:
-            enc = OneHotEncoder()  # n_values=view_num
+            enc = OneHotEncoder()
             view_preserve = enc.fit_transform(
                 randint(0, view_num, size=(alldata_len, 1))
             ).toarray()

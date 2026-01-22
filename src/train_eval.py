@@ -1,7 +1,7 @@
 import logging
 import random
 from collections import defaultdict
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Any
 
 import numpy as np
 import torch
@@ -28,7 +28,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def kl_loss_function(logvar, mu):
+def kl_loss_function(logvar: Dict[str, torch.Tensor], 
+                     mu: Dict[str, torch.Tensor]) -> float:
     keys = list(logvar.keys())
     kl_losses = []
     for r, (omics, data) in enumerate(logvar.items()):
@@ -43,7 +44,10 @@ def kl_loss_function(logvar, mu):
     return np.mean(kl_losses)
 
 
-def rec_loss(x_true, recons, tr_te_idx, mask):
+def rec_loss(x_true: Dict[str, torch.Tensor], 
+             recons: Dict[str, torch.Tensor], 
+             tr_te_idx: Dict[str, List[int]], 
+             mask: torch.Tensor) -> float:
     recon_losses = []
     for idx, (omics, data) in enumerate(x_true.items()):
         mask_idx = mask[:, idx]
@@ -411,22 +415,22 @@ def model_test_2(
 
 
 def model_train_3(
-    config,
-    graph,
-    idx_dict,
-    model,
-    device,
-    data_train,
-    data,
-    data_test,
-    label,
-    mask_train,
-    optimizer,
-    masking_dict,
-    criterion,
-    criterion1_triplet,
-    epoch,
-):
+    config: Any,
+    graph: DGLHeteroGraph,
+    idx_dict: Dict[str, int],
+    model: MultiGraphGCN,
+    device: torch.device,
+    data_train: Dict[str, torch.Tensor],
+    data: Dict[str, torch.Tensor],
+    data_test: Dict[str, torch.Tensor],
+    label: torch.Tensor,
+    mask_train: torch.Tensor,
+    optimizer: optim,
+    masking_dict: Dict[str, torch.Tensor],
+    criterion: torch.nn.modules.loss,
+    criterion1_triplet: torch.nn.modules.loss,
+    epoch: int,
+) -> Tuple[Union[float, int]]:
 
     model.train()
     optimizer.zero_grad()
@@ -479,7 +483,9 @@ def model_train_3(
         return 0, 0, 0
 
 
-def model_test_3(model, data_test, graph):
+def model_test_3(model: MultiGraphGCN, 
+                 data_test: Dict[str, torch.Tensor], 
+                 graph: DGLHeteroGraph) -> torch.Tensor:
     model.eval()
     with torch.no_grad():
         _, pred, _, _, _, _, _, _ = model(graph=graph, input_data=data_test)

@@ -3,7 +3,7 @@ import random
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
-
+from numpy.typing import NDArray
 import numpy as np
 import pandas as pd
 import torch
@@ -195,7 +195,7 @@ def read_omics_data_pkl(gene_file_name: str, path: Path) -> pd.DataFrame:
 
 
 def read_omics_data_csv(
-    gene_file_name: str, path: Path, dataset: str, labels: np.array
+    gene_file_name: str, path: Path, dataset: str, labels: NDArray[np.int64]
 ) -> pd.DataFrame:
     data = pd.read_csv(path / f"{gene_file_name}.csv")
     if dataset in [DataEnum.AML.name, DataEnum.LIHC.name]:

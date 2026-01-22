@@ -43,7 +43,7 @@ def run_model(
         DataEnum.KIPAN.name,
         DataEnum.LGG.name,
     ]:
-        hidden_feats = [i[1] for k, i in dataset.graph.shape.items() if len(i) > 1]
+        hidden_feats = [i[1] for _, i in dataset.graph.shape.items() if len(i) > 1]
     else:
         hidden_feats = dataset.graph.shape[list(dataset.graph.shape.keys())[0]][1]
 

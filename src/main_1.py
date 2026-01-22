@@ -103,15 +103,9 @@ def run_model(
     early_stopping = 0
 
     for epoch in tqdm(range(args.epochs)):
-        (
-        # first_omics_attention, 
-        first_feature_attention,
-        # first_omics_attention_rev, 
+        ( 
+        first_feature_attention, 
         first_feature_attention_rev,
-        # second_omics_attention, 
-        # second_feature_attention,
-        # second_omics_attention_rev, 
-        # second_feature_attention_rev
         ) = model_train_1(
             model=model,
             criterion=criterion,
@@ -139,14 +133,8 @@ def run_model(
         if f1_macro_val > best_f1_macro_val:
             best_f1_macro_val = f1_macro_val
             model_parameters = {"best_model": deepcopy(model.state_dict())}          
-            # fin_first_omics_attention = first_omics_attention 
             fin_first_feature_attention = first_feature_attention
-            # fin_first_omics_attention_rev = first_omics_attention_rev 
             fin_first_feature_attention_rev = first_feature_attention_rev
-            # fin_second_omics_attention = second_omics_attention 
-            # fin_second_feature_attention = second_feature_attention
-            # fin_second_omics_attention_rev = second_omics_attention_rev 
-            # fin_second_feature_attention_rev = second_feature_attention_rev
             early_stopping = 0
         else:
             early_stopping += 1
@@ -174,21 +162,15 @@ def run_model(
         f1_test_macro,
         f1_test_weighted,
         matthews_corrcoef_test,
-        # fin_first_omics_attention,
         fin_first_feature_attention,
-        # fin_first_omics_attention_rev,
         fin_first_feature_attention_rev,
-        # fin_second_omics_attention,
-        # fin_second_feature_attention,
-        # fin_second_omics_attention_rev,
-        # fin_second_feature_attention_rev,
         dataset,
     )
 
 
 def run_1(args: Any, file_path: Path, hyperparameters: Dict) -> None:
-    if not os.path.exists("results"):
-        os.makedirs("results", exist_ok=True)
+    if not os.path.exists("results/complete_scenario"):
+        os.makedirs("results/complete_scenario", exist_ok=True)
     combinations = list(product(*hyperparameters.values()))
     for combination in combinations:
         hyper = {
@@ -205,28 +187,17 @@ def run_1(args: Any, file_path: Path, hyperparameters: Dict) -> None:
             "masking_input": combination[10],
             "node_masking_ratio": combination[11]
         }
-        all_runs_attention_features_no_perclass = defaultdict()
-        all_runs_attention_features_perclass = defaultdict()
-        
+
         all_runs = defaultdict(list)
-        all_runs_omics = defaultdict()
-        all_runs_attention_features_score = defaultdict()
         dict_key = "_".join([str(i) for i in combination])
         for rs in RANDOM_SEEDS:
-            # all_runs_attention_features_score = defaultdict()
             (
                 test_accuracy,
                 f1_test_macro,
                 f1_test_weighted,
                 matthews_corrcoef_test,
-                # fin_first_omics_attention,
                 fin_first_feature_attention,
-                # fin_first_omics_attention_rev,
                 fin_first_feature_attention_rev,
-                # fin_second_omics_attention,
-                # fin_second_feature_attention,
-                # fin_second_omics_attention_rev,
-                # fin_second_feature_attention_rev,
                 dataset,
             ) = run_model(config=hyper, args=args, path=file_path, random_state=rs)
             all_runs["test_accuracy"].append(test_accuracy)
@@ -234,171 +205,7 @@ def run_1(args: Any, file_path: Path, hyperparameters: Dict) -> None:
             all_runs["f1_test_weighted"].append(f1_test_weighted)
             all_runs["matthews_corrcoef_test"].append(matthews_corrcoef_test)
 
-            # """Per_class = False"""
-            # first_feature_attention_forward = feature_level_attention(
-            #     weights=fin_first_feature_attention,
-            #     dataset=dataset.graph,
-            #     train_test_val="train_forward",
-            #     attention_types="all_features",
-            #     per_class_attention=False,
-            # )
-
-            # all_runs_attention_features_no_perclass[
-            #     f"{rs}_first_feature_attention_forward"
-            # ] = first_feature_attention_forward
-            
-            # try:
-            #     first_feature_attention_forward_rev = feature_level_attention(
-            #         weights=fin_first_feature_attention_rev,
-            #         dataset=dataset.graph,
-            #         train_test_val="train_reverse",
-            #         attention_types="30_top",
-            #         per_class_attention=False,
-            #     )
-
-            #     all_runs_attention_features_no_perclass[
-            #         f"{rs}_first_feature_rev_attention_forward"
-            #     ] = first_feature_attention_forward_rev
-            # except AttributeError:
-            #     pass
-            
-            # second_feature_attention_forward = feature_level_attention(
-            #     weights=fin_second_feature_attention,
-            #     dataset=dataset.graph,
-            #     train_test_val="train_forward",
-            #     attention_types="30_top",
-            #     per_class_attention=False,
-            # )
-
-            # all_runs_attention_features_no_perclass[
-            #     f"{rs}_second_feature_attention_forward"
-            # ] = second_feature_attention_forward
-            
-            
-            
-            
-            # second_feature_attention_forward_rev = feature_level_attention(
-            #     weights=fin_second_feature_attention_rev,
-            #     dataset=dataset.graph,
-            #     train_test_val="train_reverse",
-            #     attention_types="30_top",
-            #     per_class_attention=False,
-            # )
-
-            # all_runs_attention_features_no_perclass[
-            #     f"{rs}_second_feature_rev_attention_forward"
-            # ] = second_feature_attention_forward_rev
-
-
-
-            # """Per_class = True"""
-            # first_feature_attention_forward = feature_level_attention(
-            #     weights=fin_first_feature_attention,
-            #     dataset=dataset.graph,
-            #     train_test_val="train_forward",
-            #     attention_types="30_top",
-            #     per_class_attention=True,
-            # )
-
-            # all_runs_attention_features_perclass[
-            #     f"{rs}_first_feature_attention_forward"
-            # ] = first_feature_attention_forward
-            
-            # try:
-            #     first_feature_attention_forward_rev = feature_level_attention(
-            #         weights=fin_first_feature_attention_rev,
-            #         dataset=dataset.graph,
-            #         train_test_val="train_reverse",
-            #         attention_types="30_top",
-            #         per_class_attention=True,
-            #     )
-
-            #     all_runs_attention_features_perclass[
-            #         f"{rs}_first_feature_rev_attention_forward"
-            #     ] = first_feature_attention_forward_rev
-            # except AttributeError:
-            #     pass
-            
-            # second_feature_attention_forward = feature_level_attention(
-            #     weights=fin_second_feature_attention,
-            #     dataset=dataset.graph,
-            #     train_test_val="train_forward",
-            #     attention_types="30_top",
-            #     per_class_attention=True,
-            # )
-
-            # all_runs_attention_features_perclass[
-            #     f"{rs}_second_feature_attention_forward"
-            # ] = second_feature_attention_forward
-            
-            
-            
-            
-            # second_feature_attention_forward_rev = feature_level_attention(
-            #     weights=fin_second_feature_attention_rev,
-            #     dataset=dataset.graph,
-            #     train_test_val="train_reverse",
-            #     attention_types="30_top",
-            #     per_class_attention=True,
-            # )
-
-            # all_runs_attention_features_perclass[
-            #     f"{rs}_second_feature_rev_attention_forward"
-            # ] = second_feature_attention_forward_rev
-            
-            # all_runs_attention_features_score[f"fin_first_feature_attention_{rs}"] = fin_first_feature_attention
-            # all_runs_attention_features_score[f"fin_first_rev_feature_attention{rs}"] = fin_first_feature_attention_rev
-            # all_runs_attention_features_score[f"fin_second_feature_attention_{rs}"] = fin_second_feature_attention
-            # all_runs_attention_features_score[f"fin_second_rev_feature_attention{rs}"] = fin_second_feature_attention_rev
-            # with open(f"results/{args.dataset}_all_runs_attention_features_score_att_score_fin_final_12_NEW_br_{rs}.pkl", "wb") as file:
-            #     pickle.dump(all_runs_attention_features_score, file)
-            # all_runs_omics[f"fin_first_omics_attention_{rs}"] = fin_first_omics_attention
-            # all_runs_omics[f"fin_first_rev_omics_attention{rs}"] = fin_first_omics_attention_rev
-            # all_runs_omics[f"fin_second_omics_attention_{rs}"] = fin_second_omics_attention
-            # all_runs_omics[f"fin_second_rev_omics_attention{rs}"] = fin_second_omics_attention_rev
-            # with open(f"results/000_{args.dataset}_{dict_key}_fin_first_feature_attention_{rs}.pkl", "wb") as file:
-            #     pickle.dump(fin_first_feature_attention, file)
-            # with open(f"results/000_{args.dataset}_{dict_key}_fin_first_feature_attention_rev_{rs}.pkl", "wb") as file:
-            #     pickle.dump(fin_first_feature_attention_rev, file)
-        # with open(f"results/{args.dataset}_{dict_key}_all_runs_attention_features_score_att_score_fin_final.pkl", "wb") as file:
-        #     pickle.dump(all_runs_attention_features_score, file)
-        # with open(f"results/{args.dataset}_all_runs_omics_fin_final.pkl", "wb") as file:
-        #     pickle.dump(all_runs_omics, file)
-        # with open(f"results/{args.dataset}_all_runs_attention_features_score_att_score_fin_final_12_NEW_.pkl", "wb") as file:
-        #     pickle.dump(all_runs_attention_features_score, file)
-        # with open(f"results/{args.dataset}_{dict_key}_all_runs_attention_features_no_perclass_final.pkl", "wb") as file:
-        #     pickle.dump(all_runs_attention_features_no_perclass, file)
-        # with open(f"results/{args.dataset}_all_runs_attention_features_score_att_score_fin_final.pkl", "wb") as file:
-        #     pickle.dump(all_runs_attention_features_score, file)
-        # with open(f"results/{args.dataset}_all_runs_attention_features_no_perclass_final.pkl", "wb") as file:
-        #     pickle.dump(all_runs_attention_features_no_perclass, file)
-        # with open(f"results/{args.dataset}_{dict_key}_all_runs_attention_features_perclass_final.pkl", "wb") as file:
-        #     pickle.dump(all_runs_attention_features_perclass, file)
-
-        # with open(f"results/{args.dataset}_all_runs_omics_final.pkl", "wb") as file:
-        #     pickle.dump(all_runs_omics, file)
-            
-            
-            
-        pd.DataFrame(all_runs).to_csv(f"results/{dict_key}_{args.dataset}_1.csv")
-        
-        mrr_dictionary = defaultdict(defaultdict)
-        list_of_keys = return_dicitonaries_key(all_runs_attention_features_score)
-        # for omics in create_mrr_dataset(args.dataset):
-        for omics in ['meth', "mirna", "expression"]:
-            for keys in list_of_keys:
-                # try:
-                mrr_dictionary[keys][omics] = mrr(
-                    all_runs_attention_features_score=all_runs_attention_features_score,
-                    omics=omics,
-                    keys=keys,
-                    feature_lists=dataset.graph.features_list,
-                )
-                # except:
-                #     pass
-        with open(f"results/{args.dataset}_{dict_key}_mrr_fin_1.pkl", "wb") as file:
-            pickle.dump(mrr_dictionary, file)
-            
+        pd.DataFrame(all_runs).to_csv(f"results/complete_scenario/{args.dataset}.csv")
 
     print(
         f'accuracy{np.mean(all_runs["test_accuracy"])}±{np.std(all_runs["test_accuracy"])},\n'
@@ -406,8 +213,4 @@ def run_1(args: Any, file_path: Path, hyperparameters: Dict) -> None:
         f'f1_test_weighted:{np.mean(all_runs["f1_test_weighted"])}±{np.std(all_runs["f1_test_weighted"])},\n'
         f'matthews_corrcoef_test:{np.mean(all_runs["matthews_corrcoef_test"])}±{np.std(all_runs["matthews_corrcoef_test"])}'
     )
-        
-    # all_runs_omics
-    
-    
-    
+

@@ -43,20 +43,24 @@ The current implementation supports input files in two formats.
 
 ```text
 dataset/
-└── TCGA_BRCA/
-    ├── meth.csv
-    ├── mirna.csv
-    ├── expression.csv
-    └── labels.csv
+└── data_for_complete_scenario/
+    └── TCGA_BRCA/
+        ├── meth.csv
+        ├── mirna.csv
+        ├── expression.csv
+        └── labels.csv
+
 ```
 #### Option 2: Pickle Format 
 
 ```text
 dataset/
-└── TCGA_GBM/
-    ├── mirna.pkl
-    ├── expression.pkl
-    └── labels.pkl
+└── data_for_complete_scenario/
+    └── TCGA_GBM/
+        ├── mirna.pkl
+        ├── expression.pkl
+        └── labels.pkl
+
 ```
 ### 3. File Naming Convention and Omics Order
 The dataset files must be named based on the omics types, and their names (excluding file extensions) should exactly match the entries in **`model_config.py`**.  Here is an example:
@@ -67,9 +71,9 @@ This represents the flow of omics types in TCGA_BRCA from meth (methylation) to 
 
 ### To run the code
 ```shell script
- python main_run.py --dataset=TCGA_GBM --epochs=450 --early_stopping=150
+ python src/main_run.py --dataset=TCGA_GBM --epochs=450 --early_stopping=150
 ```
-In the examples above, **`TCGA_GBM`** refers to the name of the dataset (**`dataset/TCGA_GBM/`**).
+In the examples above, **`TCGA_GBM`** refers to the name of the dataset (**`dataset/data_for_complete_scenario/TCGA_GBM/`**).
 
 ##### The supplemental document is available in the supplementary folder.
 

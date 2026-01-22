@@ -160,14 +160,8 @@ def model_train_1(
                                                      node_masking_ratio=node_masking_ratio)               
     (embeddings, 
      pred, 
-    #  first_omics_attention, 
     first_feature_attention,
-    # first_omics_attention_rev, 
     first_feature_attention_rev,
-    # second_omics_attention, 
-    # second_feature_attention,
-    # second_omics_attention_rev, 
-    # second_feature_attention_rev
     ) = model(
         graph=graph, input_data=train_data
     )
@@ -199,14 +193,8 @@ def model_train_1(
         f"Train loss:{loss:.4f}, Train accuracy:{accuracy:.4f}, f1_macro:{f1_macro:.4f}, f1_weighted:{f1_weighted:.4f}, matthews_corrcoef_:{matthews_corrcoef_:.4f}"
     )
     return (
-    # first_omics_attention, 
     first_feature_attention,
-    # first_omics_attention_rev, 
-    "first_feature_attention_rev",
-    # second_omics_attention, 
-    # second_feature_attention,
-    # second_omics_attention_rev, 
-    # second_feature_attention_rev
+    first_feature_attention_rev,
     )
 
 
@@ -283,14 +271,8 @@ def model_train_2(
     optimizer.zero_grad()
     (embeddings, 
      pred, 
-    #  first_omics_attention, 
     first_feature_attention,
-    # first_omics_attention_rev, 
     first_feature_attention_rev,
-    # second_omics_attention, 
-    # second_feature_attention,
-    # second_omics_attention_rev, 
-    # second_feature_attention_rev
     ) = model(
         graph=graph, input_data=train_data
     )
@@ -333,15 +315,9 @@ def model_train_2(
         f"Train loss:{loss:.4f}, Train accuracy:{accuracy:.4f}, f1_macro:{f1_macro:.4f}, f1_weighted:{f1_weighted:.4f},\n"
         f"matthews_corrcoef_:{matthews_corrcoef_:.4f}, aupr:{aupr:.4f}, auc:{auc_res:.4f}, f1:{f1:.4f}, auprc:{auprc:.4f}, pre:{pre_res:.4f}"
     )
-    return (f1_macro,  # , omics_attention_forward, feature_attention_forward
-    # first_omics_attention,
-    first_feature_attention,
-    # first_omics_attention_rev, 
+    return (f1_macro,
+    first_feature_attention, 
     first_feature_attention_rev,
-    # second_omics_attention, 
-    # second_feature_attention,
-    # second_omics_attention_rev, 
-    # second_feature_attention_rev
     )
 
 @torch.no_grad()
@@ -353,7 +329,7 @@ def model_evaluate_2(
     masking_dict: Dict[str, torch.Tensor],
 ) -> Tuple[float, torch.Tensor, Dict[str, torch.Tensor]]:
     model.eval()
-    _, pred, omics_attention_forward, feature_attention_forward = model(
+    _, pred, first_feature_attention, first_feature_attention_rev = model(
         graph=graph, input_data=train_data
     )
     label_val = label[masking_dict["val_idx"]]
@@ -373,7 +349,7 @@ def model_evaluate_2(
         f"Val accuracy:{accuracy:.4f}, f1_macro:{f1_macro:.4f}, f1_weighted:{f1_weighted:.4f}, matthews_corrcoef_:{matthews_corrcoef_:.4f},\n"
         f"aupr:{aupr:.4f}, auc:{auc_res:.4f}, f1:{f1:.4f}, auprc:{auprc:.4f}, pre:{pre_res:.4f}"
     )
-    return f1_macro, omics_attention_forward, feature_attention_forward
+    return f1_macro, first_feature_attention, first_feature_attention_rev
 
 
 @torch.no_grad()
@@ -387,15 +363,9 @@ def model_test_2(
 ) -> Tuple[float]:
     model.eval()
     (embeddings, 
-     pred, 
-    #  first_omics_attention, 
-    first_feature_attention,
-    # first_omics_attention_rev, 
+     pred,  
+    first_feature_attention, 
     first_feature_attention_rev,
-    # second_omics_attention, 
-    # second_feature_attention,
-    # second_omics_attention_rev, 
-    # second_feature_attention_rev
     ) = model(graph=graph, input_data=data)
     if transfer_learning:
         label_test = label
@@ -455,21 +425,14 @@ def model_train_3(config,
           criterion1_triplet,
           epoch):
 
-    # data_tr_list, mask_train, labels_tr_tensor, device,
     model.train()
     optimizer.zero_grad()
             
     (embeddings, 
     pred, 
     final_embeddings,
-    #  first_omics_attention, 
     first_feature_attention,
-    # first_omics_attention_rev, 
     first_feature_attention_rev,
-    # second_omics_attention, 
-    second_feature_attention,
-    # second_omics_attention_rev, 
-    second_feature_attention_rev,
     mu, var, recons
     ) = model(
         graph=graph, input_data=data_train
@@ -487,18 +450,14 @@ def model_train_3(config,
         train_test="train_idx",
         device=device,
     )
-    # loss += additional_loss
     los = kl_losses + additional_loss + imputation_losses + loss 
-    # los = (model.alpha * additional_loss) + (model.beta * imputation_losses) + (model.gamma * kl_losses) + (model.gamma1 * loss)
     los.backward()
     optimizer.step()
 
-    # scheduler.step()
     if epoch % config['test_inverval'] == 0:
         te_prob = model_test_3(model, data_test, graph)
         label_test = graph.label[masking_dict["test_idx"]]
         pred_test = te_prob[masking_dict["test_idx"]].argmax(dim=1)
-        # if not np.any(np.isnan(pred_test.cpu())):
         print("\nTest: Epoch {:d}".format(epoch))
         if graph.num_class == 2:
             acc = accuracy_score(label_test.cpu(), pred_test.cpu())
@@ -519,11 +478,5 @@ def model_train_3(config,
 def model_test_3(model, data_test, graph):
     model.eval()
     with torch.no_grad():
-        _, pred, _, _,_, _, _, _, _ , _= model(graph=graph, input_data=data_test)
-        # prob = F.softmax(pred, dim=1).data.cpu().numpy()
+        _, pred, _, _,_, _, _, _ = model(graph=graph, input_data=data_test)
     return pred
-
-# def save_checkpoint(self, checkpoint_path, filename="checkpoint.pt"):
-#     os.makedirs(checkpoint_path, exist_ok=True)
-#     filename = os.path.join(checkpoint_path, filename)
-#     torch.save(model.state_dict(), filename)

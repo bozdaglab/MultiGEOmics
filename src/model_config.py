@@ -25,7 +25,7 @@ ADNI_ORDER = [["snps", "bile"], ["snps", "lipids"]]
 
 def load_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, default="BRCA_M", help="dataset name")
+    parser.add_argument("--dataset", type=str, default="TCGA_GBM", help="dataset name")
     parser.add_argument(
         "--epochs", type=int, default=450, help="number of epochs to train."
     )

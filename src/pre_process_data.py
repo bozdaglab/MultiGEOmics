@@ -180,7 +180,6 @@ class MultiOmicsData(DGLDataset):
                     .to(self.device)
                 )
                 self.graph.label = train_test_data["label"].to(self.device)
-                self.graph.features_list = train_test_data["features"]
         except AttributeError:
             for omic in self.omics_type:
                 self.graph.nodes["patient"].data[f"{omic}"] = (
@@ -189,7 +188,6 @@ class MultiOmicsData(DGLDataset):
                     .to(self.device)
                 )
                 self.graph.label = torch.from_numpy(train_test_data["label"]).to(self.device)
-                self.graph.features_list = None
         self.graph.shape = {
             key: val.shape
             for key, val in islice(train_test_data.items(), 0, len(train_test_data) - 1)

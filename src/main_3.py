@@ -1,7 +1,7 @@
 import argparse
 import os
 from enum_holder import DataEnum
-
+import logging
 
 import json
 import torch
@@ -26,6 +26,8 @@ from collections import defaultdict
 from copy import deepcopy
 from itertools import product
 import pickle
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def run_model(
     config: Dict, args: Any, path: Path,
@@ -63,7 +65,6 @@ def run_model(
     data_clone_tr = {k: v.clone() for k, v in data.items()}
     data_clone_te = {k: v.clone() for k, v in data.items()}
     for idx, (k, v) in enumerate(data_clone_tr.items()):
-        # if idx != 0:
         masked_dim_train = torch.unsqueeze(mask_train[:, idx], 1)
         v[dataset.graph.idx_dict['tr']] = v[dataset.graph.idx_dict['tr']] * masked_dim_train
         data_train[k] = v
@@ -72,7 +73,6 @@ def run_model(
     mask_test = torch.from_numpy(np.asarray(mask_test, dtype=np.float32)).to(device)
     data_test = defaultdict()
     for idx, (k, v) in enumerate(data_clone_te.items()):
-        # if idx != 0:
         masked_dim_test = torch.unsqueeze(mask_test[:, idx], 1)
         v[dataset.graph.idx_dict['te']] = v[dataset.graph.idx_dict['te']] * masked_dim_test
         data_test[k] = v
@@ -110,9 +110,6 @@ def run_model(
         best_eval = {"acc": None, 
                         "f1w":None, 
                         "f1m":None}
-    print("\nTraining...")
-    # optimizer = torch.optim.RAdam(model.parameters(), lr=params['lr'], weight_decay=1e-4)
-    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=params['step_size'], gamma=0.2)
     criterion = torch.nn.CrossEntropyLoss()
     criterion1_triplet = torch.nn.TripletMarginWithDistanceLoss(
         distance_function=torch.nn.PairwiseDistance()
@@ -144,12 +141,13 @@ def run_model(
                 best_eval = {"acc": res1, 
                                 "f1w":res2, 
                                 "f1m":res3}
-
-    return best_eval
+    logger.info(best_eval)
+    with open(f"results/missing_scenario/{args.dataset}.pkl", "wb") as file:
+        pickle.dump(best_eval, file)
 
 def run_3(args: Any, file_path: Path, hyperparameters: Dict) -> None:
-    if not os.path.exists("results"):
-        os.makedirs("results", exist_ok=True)
+    if not os.path.exists("results/missing_scenario"):
+        os.makedirs("results/missing_scenario", exist_ok=True)
     combinations = list(product(*hyperparameters.values()))
     saving_path = Path(__file__).parent.parent / "clclsa_datasets" / "results"
     print(saving_path)
@@ -172,7 +170,5 @@ def run_3(args: Any, file_path: Path, hyperparameters: Dict) -> None:
             "step_size": combination[12],
             "test_inverval": combination[13],
         }
-        best_eval = run_model(config=hyper, args=args, path=file_path)
+        run_model(config=hyper, args=args, path=file_path)
 
-        with open(f"{dict_key}.pkl", "wb") as file:
-            pickle.dump(best_eval, file)

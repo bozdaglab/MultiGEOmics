@@ -337,7 +337,12 @@ class MultiGraphGCN(nn.Module):
             first_hop_att_embeddings,
             first_feature_attention,
         ) = self.attentionencoder(first_hop_embeddings)
-        if self.args.dataset != DataEnum.ADNI.name:
+        if self.args.dataset not in [DataEnum.ADNI.name,
+                                     DataEnum.BRCA.name,
+                                     DataEnum.PRAD.name,
+                                     DataEnum.LIHC.name,
+                                     DataEnum.BLCA.name,
+                                    ]:
             first_hop_rev_embeddings = sort_data_order(
                 dataset=self.args.dataset, train_data=first_hop_embeddings, forwards=False
                 )
@@ -356,85 +361,24 @@ class MultiGraphGCN(nn.Module):
             etyoe: self.conv2[etyoe](graph[etyoe], first_hop_att_embeddings[etyoe])
             for etyoe in input_data.keys()
         }
-        if self.two_level_attention:
-            second_hop_embeddings_correct_shape = self.correct_shape(
-                second_hop_embeddings
-            )
-            (second_hop_att_embeddings, 
-            #  second_omics_attention, 
-             second_feature_attention) = self.attentionencoder(
-                second_hop_embeddings_correct_shape
-            )
-
-            second_hop_rev_embeddings = sort_data_order(dataset=self.args.dataset, train_data=second_hop_embeddings, forwards=False)
-            second_hop_rev_embeddings = self.correct_shape(second_hop_rev_embeddings)
-            (second_hop_att_embeddings_rev, 
-            #  second_omics_attention_rev, 
-             _) = self.attentionencoder(second_hop_rev_embeddings)
-            
-
-            first_con = {k: second_hop_embeddings[k] * second_hop_att_embeddings[k] for k in second_hop_embeddings.keys()}
-            second_con = {k: second_hop_embeddings[k] * second_hop_att_embeddings_rev[k] for k in second_hop_embeddings.keys()}
-            fin_embds = {k: first_con[k] + second_con[k] for k in first_con.keys()}
-
-            return (fin_embds, 
-                    # first_omics_attention, 
-                    first_feature_attention,
-                    # first_omics_attention_rev, 
-                    # first_feature_attention_rev,
-                    # second_omics_attention, 
-                    second_feature_attention,
-                    # second_omics_attention_rev, 
-                    # second_feature_attention_rev
-            )
         try:
             return (second_hop_embeddings,
-                    # first_omics_attention, 
                     first_feature_attention,
                     first_omics_attention_rev, 
-                    # first_feature_attention_rev,
-                        # "second_omics_attention", 
-                        # "second_feature_attention",
-                        # "second_omics_attention_rev", 
-                        # "second_feature_attention_rev"
-                # second_hop_embeddings,
-                # # self.correct_shape(second_hop_embeddings),
-                # omics_attention,
-                # feature_attention,
-                # # omics_attention_rev, 
-                # # feature_attention_rev
             )
         except UnboundLocalError:
             return (second_hop_embeddings,
-                    # first_omics_attention, 
                     first_feature_attention,
                     "first_omics_attention_rev", 
-                    # first_feature_attention_rev,
-                        # "second_omics_attention", 
-                        # "second_feature_attention",
-                        # "second_omics_attention_rev", 
-                        # "second_feature_attention_rev"
-                # second_hop_embeddings,
-                # # self.correct_shape(second_hop_embeddings),
-                # omics_attention,
-                # feature_attention,
-                # # omics_attention_rev, 
-                # # feature_attention_rev
             )
 
     def forward(
         self, graph: DGLHeteroGraph, input_data: Dict[str, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Dict[str, torch.Tensor]]:
         (
-            second_hop_embeddings,
-            # first_omics_attention, 
-            first_feature_attention,
-            # first_omics_attention_rev, 
+            second_hop_embeddings, 
+            first_feature_attention, 
             first_feature_attention_rev,
-            # second_omics_attention, 
-            # second_feature_attention,
-            # second_omics_attention_rev, 
-            # second_feature_attention_rev
         ) = self.message_passings_embeddings(graph, input_data)
         if self.reverse_attention:
             reverse_input_data = sort_data_order(
@@ -475,14 +419,8 @@ class MultiGraphGCN(nn.Module):
                 out_embeddings,
                 self.label_classifier(out_embeddings),
                 recons,
-                # first_omics_attention, 
-                first_feature_attention,
-                # first_omics_attention_rev, 
+                first_feature_attention, 
                 first_feature_attention_rev,
-                # second_omics_attention, 
-                "second_feature_attention",
-                # second_omics_attention_rev, 
-                "second_feature_attention_rev",
                 mus, logvars, recons
             )
         else:
@@ -493,13 +431,7 @@ class MultiGraphGCN(nn.Module):
             out_embeddings = self.lin_transpose(torch.concat(second_hop_embeddings, dim=-1))
             return (
                 out_embeddings,
-                self.label_classifier(out_embeddings),
-                # first_omics_attention, 
-                first_feature_attention,
-                # first_omics_attention_rev, 
+                self.label_classifier(out_embeddings), 
+                first_feature_attention, 
                 first_feature_attention_rev,
-                # second_omics_attention, 
-                # second_feature_attention,
-                # second_omics_attention_rev, 
-                # "second_feature_attention_rev"
             )

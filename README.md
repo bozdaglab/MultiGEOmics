@@ -74,22 +74,3 @@ This represents the flow of omics types in TCGA_BRCA from meth (methylation) to 
  python src/main_run.py --dataset=TCGA_GBM --epochs=450 --early_stopping=150
 ```
 In the examples above, **`TCGA_GBM`** refers to the name of the dataset (**`dataset/data_for_complete_scenario/TCGA_GBM/`**).
-
-##### The supplemental document is available in the supplementary folder.
-
-
-
-
-
-
-
-####
-cross omics top 10 or 0.01 percent 
-    do the enrichment
-    do sankey plot
-    do the cascade 
-complete the imputatiuon part 
-    0,0 and last dataset
-10 percent of the data
-    sanky plot self attention
-    GO/KEGG

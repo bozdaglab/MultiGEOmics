@@ -1,12 +1,13 @@
 import logging
 import random
-import os
-from typing import Dict, List, Tuple, Union
 from collections import defaultdict
+from typing import Dict, List, Tuple, Union
+
 import numpy as np
 import torch
 from dgl.heterograph import DGLHeteroGraph
 from sklearn.metrics import (
+    accuracy_score,
     auc,
     average_precision_score,
     f1_score,
@@ -14,14 +15,12 @@ from sklearn.metrics import (
     precision_recall_curve,
     precision_score,
     recall_score,
+    roc_auc_score,
     roc_curve,
-    accuracy_score,
-    roc_auc_score
 )
 from torch import optim
 from torch.nn.modules.loss import CrossEntropyLoss, TripletMarginWithDistanceLoss
 from torch.optim import Optimizer
-from helper import masking, mrr, sort_data_order, return_dicitonaries_key
 
 from model import MultiGraphGCN
 
@@ -32,14 +31,17 @@ logger = logging.getLogger(__name__)
 def kl_loss_function(logvar, mu):
     keys = list(logvar.keys())
     kl_losses = []
-    for r, (omics, data) in enumerate(logvar.items()): 
+    for r, (omics, data) in enumerate(logvar.items()):
         if r == 0:
             kl = -0.5 * torch.mean(1 + data - mu[keys[r]].pow(2) - data.exp())
         else:
-            kl = -0.5 * torch.mean(1 + data - (mu[keys[r]] - mu[keys[r-1]]).pow(2) - data.exp())
+            kl = -0.5 * torch.mean(
+                1 + data - (mu[keys[r]] - mu[keys[r - 1]]).pow(2) - data.exp()
+            )
         kl_losses.append(kl.item())
 
     return np.mean(kl_losses)
+
 
 def rec_loss(x_true, recons, tr_te_idx, mask):
     recon_losses = []
@@ -47,12 +49,13 @@ def rec_loss(x_true, recons, tr_te_idx, mask):
         mask_idx = mask[:, idx]
         d = (1 - mask_idx).bool()
         recon_losses.append(
-            torch.mean((
-                (data[tr_te_idx["tr"]][d] - recons[omics][tr_te_idx["tr"]][d])
-                ) ** 2).item()
+            torch.mean(
+                ((data[tr_te_idx["tr"]][d] - recons[omics][tr_te_idx["tr"]][d])) ** 2
+            ).item()
         )
 
     return np.sum(recon_losses)
+
 
 def calculate_loss(
     label: torch.Tensor, pred: torch.Tensor, criterion: CrossEntropyLoss
@@ -120,22 +123,19 @@ def create_optimizer(
 
     return optimizer_model
 
+
 def masking_node_edges(graph, input_data, node_masking_ratio=0.1):
-    input_data_masked = {key: data.clone()
-                    for key, data in input_data.items()
-                    }
+    input_data_masked = {key: data.clone() for key, data in input_data.items()}
     input_data_masked_dict = defaultdict()
     masked_dict = defaultdict()
     for idx, (key, data) in enumerate(input_data_masked.items()):
         node_masked = torch.bernoulli(
-        torch.full(
-            data.shape, 1 - node_masking_ratio
-            )).bool()
+            torch.full(data.shape, 1 - node_masking_ratio)
+        ).bool()
         masked_dict[key] = node_masked
         data[~node_masked] = 0.0
         input_data_masked_dict[key] = data
     return input_data_masked_dict, masked_dict
-
 
 
 def model_train_1(
@@ -151,20 +151,19 @@ def model_train_1(
     masking_input: bool,
     node_masking_ratio: float,
 ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
-    
+
     model.train()
     optimizer.zero_grad()
     if masking_input:
-        train_data, masked_dict = masking_node_edges(graph=graph, 
-                                                     input_data=train_data, 
-                                                     node_masking_ratio=node_masking_ratio)               
-    (embeddings, 
-     pred, 
-    first_feature_attention,
-    first_feature_attention_rev,
-    ) = model(
-        graph=graph, input_data=train_data
-    )
+        train_data, masked_dict = masking_node_edges(
+            graph=graph, input_data=train_data, node_masking_ratio=node_masking_ratio
+        )
+    (
+        embeddings,
+        pred,
+        first_feature_attention,
+        first_feature_attention_rev,
+    ) = model(graph=graph, input_data=train_data)
     label_train = label[masking_dict["train_idx"]]
     pred_train = pred[masking_dict["train_idx"]]
     loss = calculate_loss(label=label_train, pred=pred_train, criterion=criterion)
@@ -193,8 +192,8 @@ def model_train_1(
         f"Train loss:{loss:.4f}, Train accuracy:{accuracy:.4f}, f1_macro:{f1_macro:.4f}, f1_weighted:{f1_weighted:.4f}, matthews_corrcoef_:{matthews_corrcoef_:.4f}"
     )
     return (
-    first_feature_attention,
-    first_feature_attention_rev,
+        first_feature_attention,
+        first_feature_attention_rev,
     )
 
 
@@ -211,10 +210,10 @@ def model_evaluate_1(
 
     model.eval()
     if masking_input:
-        train_data, masked_dict = masking_node_edges(graph=graph, 
-                                                     input_data=train_data, 
-                                                     node_masking_ratio=node_masking_ratio)
-    _, pred, _, _= model(graph=graph, input_data=train_data)
+        train_data, masked_dict = masking_node_edges(
+            graph=graph, input_data=train_data, node_masking_ratio=node_masking_ratio
+        )
+    _, pred, _, _ = model(graph=graph, input_data=train_data)
     label_val = label[masking_dict["val_idx"]]
     pred_val = pred[masking_dict["val_idx"]].argmax(dim=1)
     accuracy = (pred_val == label_val).float().mean()
@@ -240,9 +239,9 @@ def model_test_1(
 
     model.eval()
     if masking_input:
-        data, masked_dict = masking_node_edges(graph=graph, 
-                                                     input_data=data, 
-                                                     node_masking_ratio=node_masking_ratio)
+        data, masked_dict = masking_node_edges(
+            graph=graph, input_data=data, node_masking_ratio=node_masking_ratio
+        )
     _, pred, _, _ = model(graph=graph, input_data=data)
     label_test = label[masking_dict["test_idx"]]
     pred_test = pred[masking_dict["test_idx"]].argmax(dim=1)
@@ -269,13 +268,12 @@ def model_train_2(
 ) -> float:
     model.train()
     optimizer.zero_grad()
-    (embeddings, 
-     pred, 
-    first_feature_attention,
-    first_feature_attention_rev,
-    ) = model(
-        graph=graph, input_data=train_data
-    )
+    (
+        embeddings,
+        pred,
+        first_feature_attention,
+        first_feature_attention_rev,
+    ) = model(graph=graph, input_data=train_data)
     label_train = label[masking_dict["train_idx"]]
     pred_train = pred[masking_dict["train_idx"]]
     loss = calculate_loss(label=label_train, pred=pred_train, criterion=criterion)
@@ -315,10 +313,12 @@ def model_train_2(
         f"Train loss:{loss:.4f}, Train accuracy:{accuracy:.4f}, f1_macro:{f1_macro:.4f}, f1_weighted:{f1_weighted:.4f},\n"
         f"matthews_corrcoef_:{matthews_corrcoef_:.4f}, aupr:{aupr:.4f}, auc:{auc_res:.4f}, f1:{f1:.4f}, auprc:{auprc:.4f}, pre:{pre_res:.4f}"
     )
-    return (f1_macro,
-    first_feature_attention, 
-    first_feature_attention_rev,
+    return (
+        f1_macro,
+        first_feature_attention,
+        first_feature_attention_rev,
     )
+
 
 @torch.no_grad()
 def model_evaluate_2(
@@ -362,10 +362,11 @@ def model_test_2(
     transfer_learning: bool,
 ) -> Tuple[float]:
     model.eval()
-    (embeddings, 
-     pred,  
-    first_feature_attention, 
-    first_feature_attention_rev,
+    (
+        embeddings,
+        pred,
+        first_feature_attention,
+        first_feature_attention_rev,
     ) = model(graph=graph, input_data=data)
     if transfer_learning:
         label_test = label
@@ -409,34 +410,37 @@ def model_test_2(
     )
 
 
-def model_train_3(config, 
-          graph, 
-          idx_dict, 
-          model, 
-          device,
-          data_train,
-          data,
-          data_test,
-          label,
-          mask_train,
-          optimizer,
-          masking_dict,
-          criterion,
-          criterion1_triplet,
-          epoch):
+def model_train_3(
+    config,
+    graph,
+    idx_dict,
+    model,
+    device,
+    data_train,
+    data,
+    data_test,
+    label,
+    mask_train,
+    optimizer,
+    masking_dict,
+    criterion,
+    criterion1_triplet,
+    epoch,
+):
 
     model.train()
     optimizer.zero_grad()
-            
-    (embeddings, 
-    pred, 
-    final_embeddings,
-    first_feature_attention,
-    first_feature_attention_rev,
-    mu, var, recons
-    ) = model(
-        graph=graph, input_data=data_train
-    )
+
+    (
+        embeddings,
+        pred,
+        final_embeddings,
+        first_feature_attention,
+        first_feature_attention_rev,
+        mu,
+        var,
+        recons,
+    ) = model(graph=graph, input_data=data_train)
     kl_losses = kl_loss_function(var, mu)
     imputation_losses = rec_loss(data, recons, idx_dict, mask_train)
     label_train = label[masking_dict["train_idx"]]
@@ -450,11 +454,11 @@ def model_train_3(config,
         train_test="train_idx",
         device=device,
     )
-    los = kl_losses + additional_loss + imputation_losses + loss 
+    los = kl_losses + additional_loss + imputation_losses + loss
     los.backward()
     optimizer.step()
 
-    if epoch % config['test_inverval'] == 0:
+    if epoch % config["test_inverval"] == 0:
         te_prob = model_test_3(model, data_test, graph)
         label_test = graph.label[masking_dict["test_idx"]]
         pred_test = te_prob[masking_dict["test_idx"]].argmax(dim=1)
@@ -467,8 +471,8 @@ def model_train_3(config,
             return acc, f1, auc
         else:
             acc = accuracy_score(label_test.cpu(), pred_test.cpu())
-            f1w = f1_score(label_test.cpu(), pred_test.cpu(), average='weighted')
-            f1m = f1_score(label_test.cpu(), pred_test.cpu(), average='macro')
+            f1w = f1_score(label_test.cpu(), pred_test.cpu(), average="weighted")
+            f1m = f1_score(label_test.cpu(), pred_test.cpu(), average="macro")
             print(f"Test ACC: {acc:.5f}, F1 weighted : {f1w:.5f}, F1 macro: {f1m:.5f}")
             return acc, f1w, f1m
     else:
@@ -478,5 +482,5 @@ def model_train_3(config,
 def model_test_3(model, data_test, graph):
     model.eval()
     with torch.no_grad():
-        _, pred, _, _,_, _, _, _ = model(graph=graph, input_data=data_test)
+        _, pred, _, _, _, _, _, _ = model(graph=graph, input_data=data_test)
     return pred

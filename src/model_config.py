@@ -12,8 +12,8 @@ LIHC = ["snv", "miRNA", "mRNA"]
 WT = ["miRNA", "mRNA"]
 ROSMAP_M = ["meth", "mirna", "expression"]
 BRCA_M = ["meth", "mirna", "expression"]
-LGG =  ["meth", "mirna", "expression"]
-KIPAN = ["meth", "mirna", "expression"] 
+LGG = ["meth", "mirna", "expression"]
+KIPAN = ["meth", "mirna", "expression"]
 
 MASKING_M = ["train_idx", "test_idx"]
 

@@ -1,25 +1,22 @@
 import logging
+import os
 from collections import defaultdict
 from copy import deepcopy
 from itertools import product
 from pathlib import Path
-from helper import feature_level_attention
-from helper import masking, mrr, sort_data_order, return_dicitonaries_key
 from typing import Any, Dict
-import random
+
 import numpy as np
 import pandas as pd
 import torch
-import pickle
-import torch.nn.functional as F
 from sklearn.model_selection import StratifiedKFold
 from tqdm import tqdm
-import os
+
 from enum_holder import DataEnum
-from helper import masking, sort_data_order, prepare_new_data
+from helper import masking, sort_data_order
 from model import MultiGraphGCN
 from model_config import RANDOM_SEED
-from pre_process_data import MultiOmicsData, create_mrr_dataset
+from pre_process_data import MultiOmicsData
 from train_eval import create_optimizer, model_test_2, model_train_2
 
 logging.basicConfig(level=logging.INFO)
@@ -52,12 +49,14 @@ def run_model(
         hidden_feats = [i[1] for k, i in dataset.graph.shape.items() if len(i) > 1]
 
     data = {
-            omics_train_type: dataset.graph.nodes["patient"].data[omics_train_type]
-            for omics_train_type in dataset.graph.etypes
-        }
+        omics_train_type: dataset.graph.nodes["patient"].data[omics_train_type]
+        for omics_train_type in dataset.graph.etypes
+    }
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
     all_runs = defaultdict(list)
-    for rs, (train_idx, test_idx) in enumerate(skf.split(data["mRNA"], dataset.graph.label.cpu())):
+    for rs, (train_idx, test_idx) in enumerate(
+        skf.split(data["mRNA"], dataset.graph.label.cpu())
+    ):
         model = MultiGraphGCN(
             hid_emb=config["hidden_embeedings"],
             stack_types=config["stack_types"],
@@ -94,10 +93,11 @@ def run_model(
         early_stopping = 0
 
         for _ in tqdm(range(args.epochs)):
-            (f1_macro,
-        first_feature_attention, 
-        first_feature_attention_rev,
-        )= model_train_2(
+            (
+                f1_macro,
+                first_feature_attention,
+                first_feature_attention_rev,
+            ) = model_train_2(
                 model=model,
                 criterion=criterion,
                 criterion1_triplet=criterion1_triplet,
@@ -112,8 +112,6 @@ def run_model(
             if f1_macro >= best_f1_macro_val:
                 best_f1_macro_val = f1_macro
                 model_parameters = {"best_model": deepcopy(model.state_dict())}
-                fin_first_feature_attention = first_feature_attention
-                fin_first_feature_attention_rev = first_feature_attention_rev
                 early_stopping = 0
             else:
                 early_stopping += 1
@@ -138,7 +136,7 @@ def run_model(
             label=dataset.graph.label,
             data=data,
             masking_dict=masking_dict,
-            transfer_learning=transfer_learning
+            transfer_learning=transfer_learning,
         )
 
         all_runs["test_accuracy"].append(test_accuracy)
@@ -161,7 +159,7 @@ def run_model(
         f'AUC{np.mean(all_runs["auc_res"])}±{np.std(all_runs["auc_res"])}, \n'
         f'pre{np.mean(all_runs["pre"])}±{np.std(all_runs["pre"])}'
     )
-    pd.DataFrame(all_runs).to_csv(f"results/complete_scenario/{args.dataset}.csv")  
+    pd.DataFrame(all_runs).to_csv(f"results/complete_scenario/{args.dataset}.csv")
 
 
 def run_2(args: Any, file_path: Path, hyperparameters: Dict) -> None:
@@ -182,11 +180,11 @@ def run_2(args: Any, file_path: Path, hyperparameters: Dict) -> None:
             "two_level_attention": combination[9],
         }
 
-        dict_key = "_".join([str(i) for i in hyper.values()])
-
         random_state = RANDOM_SEED
         run_model(
-            config=hyper, args=args, path=file_path, random_state=random_state, transfer_learning=False
-        )      
-            
-
+            config=hyper,
+            args=args,
+            path=file_path,
+            random_state=random_state,
+            transfer_learning=False,
+        )

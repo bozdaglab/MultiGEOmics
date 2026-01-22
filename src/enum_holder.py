@@ -18,7 +18,6 @@ class DataEnum(Enum):
     KIPAN = auto()
 
 
-
 class SimilarityEnum(Enum):
     cosine = auto()
     euclidean = auto()

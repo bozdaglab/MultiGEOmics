@@ -1,21 +1,21 @@
 import os
-import pickle
 from collections import defaultdict
 from copy import deepcopy
 from itertools import product
 from pathlib import Path
 from typing import Any, Dict, Tuple
+
 import numpy as np
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-from helper import feature_level_attention
+
 from enum_holder import DataEnum
-from helper import masking, mrr, sort_data_order, return_dicitonaries_key
+from helper import masking, sort_data_order
 from model import MultiGraphGCN
 from model_config import RANDOM_SEEDS
-from pre_process_data import MultiOmicsData, create_mrr_dataset
+from pre_process_data import MultiOmicsData
 from train_eval import create_optimizer, model_evaluate_1, model_test_1, model_train_1
 
 
@@ -89,10 +89,10 @@ def run_model(
     )
     masking_dict = masking(
         dataset=args.dataset,
-        range_data=range_data, 
-        train_idx=train_idx, 
-        val_idx=val_idx, 
-        test_idx=test_idx
+        range_data=range_data,
+        train_idx=train_idx,
+        val_idx=val_idx,
+        test_idx=test_idx,
     )
     criterion = torch.nn.CrossEntropyLoss()
     criterion1_triplet = torch.nn.TripletMarginWithDistanceLoss(
@@ -103,9 +103,9 @@ def run_model(
     early_stopping = 0
 
     for epoch in tqdm(range(args.epochs)):
-        ( 
-        first_feature_attention, 
-        first_feature_attention_rev,
+        (
+            first_feature_attention,
+            first_feature_attention_rev,
         ) = model_train_1(
             model=model,
             criterion=criterion,
@@ -116,8 +116,8 @@ def run_model(
             train_data=data,
             masking_dict=masking_dict,
             device=device,
-            masking_input=config['masking_input'],
-            node_masking_ratio=config['node_masking_ratio']
+            masking_input=config["masking_input"],
+            node_masking_ratio=config["node_masking_ratio"],
         )
 
         f1_macro_val = model_evaluate_1(
@@ -126,13 +126,13 @@ def run_model(
             label=dataset.graph.label,
             train_data=data,
             masking_dict=masking_dict,
-            masking_input=config['masking_input'],
-            node_masking_ratio=config['node_masking_ratio']
+            masking_input=config["masking_input"],
+            node_masking_ratio=config["node_masking_ratio"],
         )
 
         if f1_macro_val > best_f1_macro_val:
             best_f1_macro_val = f1_macro_val
-            model_parameters = {"best_model": deepcopy(model.state_dict())}          
+            model_parameters = {"best_model": deepcopy(model.state_dict())}
             fin_first_feature_attention = first_feature_attention
             fin_first_feature_attention_rev = first_feature_attention_rev
             early_stopping = 0
@@ -154,8 +154,8 @@ def run_model(
         label=dataset.graph.label,
         data=data,
         masking_dict=masking_dict,
-        masking_input=config['masking_input'],
-        node_masking_ratio=config['node_masking_ratio']
+        masking_input=config["masking_input"],
+        node_masking_ratio=config["node_masking_ratio"],
     )
     return (
         test_accuracy,
@@ -185,11 +185,10 @@ def run_1(args: Any, file_path: Path, hyperparameters: Dict) -> None:
             "dropout": combination[8],
             "two_level_attention": combination[9],
             "masking_input": combination[10],
-            "node_masking_ratio": combination[11]
+            "node_masking_ratio": combination[11],
         }
 
         all_runs = defaultdict(list)
-        dict_key = "_".join([str(i) for i in combination])
         for rs in RANDOM_SEEDS:
             (
                 test_accuracy,
@@ -213,4 +212,3 @@ def run_1(args: Any, file_path: Path, hyperparameters: Dict) -> None:
         f'f1_test_weighted:{np.mean(all_runs["f1_test_weighted"])}±{np.std(all_runs["f1_test_weighted"])},\n'
         f'matthews_corrcoef_test:{np.mean(all_runs["matthews_corrcoef_test"])}±{np.std(all_runs["matthews_corrcoef_test"])}'
     )
-

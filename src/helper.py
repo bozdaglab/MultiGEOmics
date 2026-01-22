@@ -1,40 +1,41 @@
 import pickle
+import random
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
-import random
+
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
+
 from enum_holder import DataEnum
 from model_config import (
     ADNI,
     AML,
     BLCA,
     BRCA,
+    BRCA_M,
+    KIPAN,
+    LGG,
     LIHC,
     MASKING,
     MASKING_M,
     PRAD,
     ROSMAP,
+    ROSMAP_M,
     TCGA_BRCA,
     TCGA_GBM,
     WT,
-    BRCA_M,
-    LGG,
-    KIPAN,
-    ROSMAP_M
 )
 
 
-
-
-def feature_level_attention(weights, dataset, train_test_val, attention_types, per_class_attention, k=100):
+def feature_level_attention(
+    weights, dataset, train_test_val, attention_types, per_class_attention, k=100
+):
     label = dataset.label
     features_list = dataset.features_list
     attention_weights_omics = defaultdict(dict)
-    
 
     if per_class_attention:
         for key, value in weights.items():
@@ -59,18 +60,32 @@ def feature_level_attention(weights, dataset, train_test_val, attention_types, p
                             if attention_types == "all_features":
                                 k = attention_per_omic1.shape[0]
                             topk_omic2 = torch.topk(attention_per_omic1, k)
-                            top5_indices_omic2 = [val.item() for val in topk_omic2.indices]
-                            top5_scores_omic2 = [val.item() for val in topk_omic2.values]
+                            top5_indices_omic2 = [
+                                val.item() for val in topk_omic2.indices
+                            ]
+                            top5_scores_omic2 = [
+                                val.item() for val in topk_omic2.values
+                            ]
                             keys_names = key.split("_")
                             omic1 = keys_names[0]
                             omic2 = keys_names[1]
-                            features_name_omic1 = [features_list[omic1][i] for i in top10_indices_omic1]
-                            features_name_omic2 = [features_list[omic2][i] for i in top5_indices_omic2]
-                            fin_res[mod1_idx] = (features_name_omic2, top5_scores_omic2, top5_indices_omic2)
-                        fin_results = (features_name_omic1, 
-                                    top10_scores_omic1, 
-                                    top10_indices_omic1,
-                                    fin_res)
+                            features_name_omic1 = [
+                                features_list[omic1][i] for i in top10_indices_omic1
+                            ]
+                            features_name_omic2 = [
+                                features_list[omic2][i] for i in top5_indices_omic2
+                            ]
+                            fin_res[mod1_idx] = (
+                                features_name_omic2,
+                                top5_scores_omic2,
+                                top5_indices_omic2,
+                            )
+                        fin_results = (
+                            features_name_omic1,
+                            top10_scores_omic1,
+                            top10_indices_omic1,
+                            fin_res,
+                        )
                         # top10_indices, features_names, scores, mod2_dict = fin_results
                         attention_weights_omics[key][class_label] = fin_results
                         # plot_stacked_mini_heatmaps(
@@ -88,7 +103,11 @@ def feature_level_attention(weights, dataset, train_test_val, attention_types, p
                         pass
                 else:
                     features_name = [features_list[key][i] for i in top10_indices_omic1]
-                    fin_results = (features_name, top10_scores_omic1, top10_indices_omic1)
+                    fin_results = (
+                        features_name,
+                        top10_scores_omic1,
+                        top10_indices_omic1,
+                    )
                     attention_weights_omics[key][class_label] = fin_results
                     # plot_and_save_attention_plots(key, class_label, fin_results, save_dir)
     else:
@@ -118,8 +137,8 @@ def feature_level_attention(weights, dataset, train_test_val, attention_types, p
                     for omic2_idx, omic2_val in enumerate(omic1_val):
                         att_combo_dict[
                             f"{features_list[omic1][omic1_idx]}_{features_list[omic2][omic2_idx]}"
-                            ].append(omic2_val.item())
-                    
+                        ].append(omic2_val.item())
+
                 attention_weights_omics[f"{omic1}_{omic2}"] = att_combo_dict
                 # try:
                 #     fin_res = defaultdict()
@@ -139,10 +158,10 @@ def feature_level_attention(weights, dataset, train_test_val, attention_types, p
                 #         else:
                 #             features_name_omic2 = [features_list[omic2][i] for i in top10_indices_omic1]
                 #             features_name_omic1 = [features_list[omic1][i] for i in top5_indices_omic2]
-                        
+
                 #         fin_res[mod1_idx] = (features_name_omic2, top5_scores_omic2, top5_indices_omic2)
-                #     fin_results = (features_name_omic1, 
-                #                 top10_scores_omic1, 
+                #     fin_results = (features_name_omic1,
+                #                 top10_scores_omic1,
                 #                 top10_indices_omic1,
                 #                 fin_res)
                 #     attention_weights_omics[key] = fin_results
@@ -153,6 +172,7 @@ def feature_level_attention(weights, dataset, train_test_val, attention_types, p
                 fin_results = (features_name, top10_scores_omic1, top10_indices_omic1)
                 attention_weights_omics[key] = fin_results
     return attention_weights_omics
+
 
 def read_csv(path: Path, dataset: str, name: str) -> Union[torch.Tensor, pd.DataFrame]:
     list_label = pd.read_csv(f"{path}/{dataset}/{name}.csv", header=None).values
@@ -174,7 +194,9 @@ def read_omics_data_pkl(gene_file_name: str, path: Path) -> pd.DataFrame:
     return pd.DataFrame(row_features)
 
 
-def read_omics_data_csv(gene_file_name: str, path: Path, dataset: str, labels:np.array) -> pd.DataFrame:
+def read_omics_data_csv(
+    gene_file_name: str, path: Path, dataset: str, labels: np.array
+) -> pd.DataFrame:
     data = pd.read_csv(path / f"{gene_file_name}.csv")
     if dataset in [DataEnum.AML.name, DataEnum.LIHC.name]:
         feature_to_drop = "index"
@@ -228,6 +250,7 @@ def masking(
             )
     return masking_dict
 
+
 def custome_train(model, layer_names):
     for layer_name in layer_names:
         for name, module in model.named_children():
@@ -240,46 +263,52 @@ def custome_train(model, layer_names):
     return model
 
 
-def prepare_new_data(new_dataset: Dict, dataset: Dict)-> Dict:
+def prepare_new_data(new_dataset: Dict, dataset: Dict) -> Dict:
     new_data_col_shape = {
-            omics_train_type: new_dataset.graph.nodes["patient"].data[omics_train_type].shape[1]
-            for omics_train_type in new_dataset.graph.etypes
-        }
+        omics_train_type: new_dataset.graph.nodes["patient"]
+        .data[omics_train_type]
+        .shape[1]
+        for omics_train_type in new_dataset.graph.etypes
+    }
     data_col_shape = {
-            omics_train_type: dataset.graph.nodes["patient"].data[omics_train_type].shape[1]
-            for omics_train_type in dataset.graph.etypes
-        }
-    
+        omics_train_type: dataset.graph.nodes["patient"].data[omics_train_type].shape[1]
+        for omics_train_type in dataset.graph.etypes
+    }
+
     feature_index = defaultdict()
     for omics_train_type in new_dataset.graph.etypes:
         if new_data_col_shape[omics_train_type] != data_col_shape[omics_train_type]:
             if new_data_col_shape[omics_train_type] > data_col_shape[omics_train_type]:
                 omics_train_type_index = random.sample(
-                    range(new_data_col_shape[omics_train_type]), data_col_shape[omics_train_type]
-                    )
+                    range(new_data_col_shape[omics_train_type]),
+                    data_col_shape[omics_train_type],
+                )
                 omics_train_type_index = len(omics_train_type_index)
             else:
-                omics_train_type_index = data_col_shape[omics_train_type] 
+                omics_train_type_index = data_col_shape[omics_train_type]
         else:
             omics_train_type_index = data_col_shape[omics_train_type]
         feature_index[omics_train_type] = omics_train_type_index
-        
+
     new_data = defaultdict()
     for omics_train_type in new_dataset.graph.etypes:
         new_data_omics = new_dataset.graph.nodes["patient"].data[omics_train_type]
         if new_data_omics.shape[1] != feature_index[omics_train_type]:
             if new_data_omics.shape[1] < feature_index[omics_train_type]:
                 new_data[omics_train_type] = F.pad(
-                    new_data_omics, 
-                    (0, abs(new_data_omics.shape[1] - feature_index[omics_train_type]))
-                    , value=0)
+                    new_data_omics,
+                    (0, abs(new_data_omics.shape[1] - feature_index[omics_train_type])),
+                    value=0,
+                )
             else:
-                selected_random_index = random.sample(range(new_data_omics.shape[1]), feature_index[omics_train_type])
+                selected_random_index = random.sample(
+                    range(new_data_omics.shape[1]), feature_index[omics_train_type]
+                )
                 new_data[omics_train_type] = new_data_omics[:, selected_random_index]
         else:
             new_data[omics_train_type] = new_data_omics
     return new_data
-    
+
 
 def sort_data_order(
     dataset: Any, train_data: Dict[str, torch.Tensor], forwards: bool
@@ -319,10 +348,13 @@ def sort_data_order(
     else:
         return {f"{key}": train_data.get(f"{key}") for key in data_order}
 
+
 def return_dicitonaries_key(all_runs_attention_features_score: Dict) -> List:
     all_features = []
     if isinstance(all_runs_attention_features_score, list):
-        all_runs_attention_features_score = {i:v for i, v in all_runs_attention_features_score}
+        all_runs_attention_features_score = {
+            i: v for i, v in all_runs_attention_features_score
+        }
     for i in list(all_runs_attention_features_score.keys()):
         split_name = i.split("_")
         if len(split_name) == 5:
@@ -339,34 +371,45 @@ def mrr(
     feature_lists: List[str],
 ) -> Tuple[torch.Tensor, List[str]]:
     attention_stack = torch.stack(
-        [value[omics] for k, value in all_runs_attention_features_score.items() if k.startswith(keys)]
+        [
+            value[omics]
+            for k, value in all_runs_attention_features_score.items()
+            if k.startswith(keys)
+        ]
     )
     feature_scores = attention_stack.mean(dim=1)
 
     def compute_ranks(scores: torch.Tensor) -> torch.Tensor:
         return torch.argsort(torch.argsort(-scores)) + 1
+
     if "_" in omics:
         ranks_first_omics = torch.stack([compute_ranks(row) for row in feature_scores])
         mrr_per_feature_first_omics = (1.0 / ranks_first_omics.float()).mean(dim=0)
-        sorted_mrr_first_omics, sorted_indices_first_omics = torch.sort(mrr_per_feature_first_omics, descending=True)
+        sorted_mrr_first_omics, sorted_indices_first_omics = torch.sort(
+            mrr_per_feature_first_omics, descending=True
+        )
         second_omics_idexes = defaultdict()
         top_mrr_features = defaultdict()
         for index in sorted_indices_first_omics:
-            ranks_second_omics = torch.stack([compute_ranks(row) for row in feature_scores[:, index, : ]])
-            mrr_per_feature_second_omics = (1.0 / ranks_second_omics.float()).mean(dim=0)
-            sorted_mrr_second_omics, sorted_indices_second_omics = torch.sort(mrr_per_feature_second_omics, descending=True)
-            second_omics_idexes[index] = sorted_indices_second_omics
-            top_mrr_features[
-                feature_lists[omics.split("_")[0]][index]
-                ] = [
-                    feature_lists[omics.split("_")[1]][sec_omic_index] 
-                    for sec_omic_index in sorted_indices_second_omics[:10]
-                ]
-        return (
-            (sorted_mrr_first_omics, sorted_indices_first_omics), 
-            (sorted_mrr_second_omics, sorted_indices_second_omics), 
-            top_mrr_features
+            ranks_second_omics = torch.stack(
+                [compute_ranks(row) for row in feature_scores[:, index, :]]
             )
+            mrr_per_feature_second_omics = (1.0 / ranks_second_omics.float()).mean(
+                dim=0
+            )
+            sorted_mrr_second_omics, sorted_indices_second_omics = torch.sort(
+                mrr_per_feature_second_omics, descending=True
+            )
+            second_omics_idexes[index] = sorted_indices_second_omics
+            top_mrr_features[feature_lists[omics.split("_")[0]][index]] = [
+                feature_lists[omics.split("_")[1]][sec_omic_index]
+                for sec_omic_index in sorted_indices_second_omics[:10]
+            ]
+        return (
+            (sorted_mrr_first_omics, sorted_indices_first_omics),
+            (sorted_mrr_second_omics, sorted_indices_second_omics),
+            top_mrr_features,
+        )
     else:
         ranks = torch.stack([compute_ranks(row) for row in feature_scores])
         mrr_per_feature = (1.0 / ranks.float()).mean(dim=0)
@@ -375,27 +418,3 @@ def mrr(
         for i in sorted_indices:
             top_mrr_features.append(feature_lists[omics][i])
         return sorted_mrr, sorted_indices, top_mrr_features
-
-
-def mrr_up(
-    all_runs_attention_features_score: Dict[int, Dict[str, torch.Tensor]],
-    omics: str,
-    feature_lists: List[str],
-) -> Tuple[torch.Tensor, List[str]]:
-    attention_stack = torch.stack(
-        [value[omics] for k, value in all_runs_attention_features_score.items() if k.startswith(keys)]
-    )
-    feature_scores = attention_stack.mean(dim=1)
-
-    def compute_ranks(scores: torch.Tensor) -> torch.Tensor:
-        return torch.argsort(torch.argsort(-scores)) + 1
-    if "_" in omics:
-        ranks_first_omics = torch.stack([compute_ranks(row) for row in feature_scores[:, :, 0]])
-        mrr_per_feature_first_omics = (1.0 / ranks_first_omics.float()).mean(dim=0)
-        sorted_mrr_first_omics, sorted_indices_first_omics = torch.sort(mrr_per_feature_first_omics, descending=True)
-        second_omics_idexes = defaultdict()
-        for index in sorted_indices_first_omics:
-            ranks_second_omics = torch.stack([compute_ranks(row) for row in feature_scores[:, index, : ]])
-            mrr_per_feature_second_omics = (1.0 / ranks_second_omics.float()).mean(dim=0)
-            sorted_mrr_second_omics, sorted_indices_second_omics = torch.sort(mrr_per_feature_second_omics, descending=True)
-            second_omics_idexes[index] = sorted_indices_second_omics

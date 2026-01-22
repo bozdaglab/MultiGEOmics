@@ -5,13 +5,11 @@ from typing import Any, Dict, List, Tuple, Union
 import dgl.nn as dglnn
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from dgl.heterograph import DGLHeteroGraph
 from torch import Tensor
 
 from enum_holder import DataEnum
 from helper import sort_data_order
-from model_config import ADNI_ORDER
 
 
 class FeatureAttention(nn.Module):
@@ -43,6 +41,7 @@ class LabelClassifier(nn.Module):
 
     def forward(self, out_embeddings):
         return self.mlp(out_embeddings)
+
 
 class SemanticAttention(nn.Module):
     def __init__(
@@ -135,7 +134,9 @@ class SemanticAttention(nn.Module):
             )
             output = self.combine_heads(attn_output)
             try:
-                final_output = self.norm[keys[idx]](self.dropout(output.squeeze(-1)) + decoder_inp)
+                final_output = self.norm[keys[idx]](
+                    self.dropout(output.squeeze(-1)) + decoder_inp
+                )
             except TypeError:
                 final_output = self.norm(self.dropout(output.squeeze(-1)) + decoder_inp)
             updated_attention_embeddings[keys[idx]] = final_output
@@ -151,7 +152,6 @@ class SemanticAttention(nn.Module):
         )
 
 
-
 class VAE(nn.Module):
     def __init__(self, input_size, hid_size, latent_size):
         super().__init__()
@@ -160,28 +160,27 @@ class VAE(nn.Module):
             nn.ReLU(),
             nn.Linear(hid_size, hid_size),
         )
-        
+
         self.mu = nn.Linear(hid_size, latent_size)
         self.var = nn.Linear(hid_size, latent_size)
-        
+
         self.decoder = nn.Sequential(
-            nn.Linear(latent_size, hid_size),
-            nn.ReLU(),
-            nn.Linear(hid_size, input_size)
+            nn.Linear(latent_size, hid_size), nn.ReLU(), nn.Linear(hid_size, input_size)
         )
-        
+
     def reparameterization(self, mu, var):
         std = torch.exp(0.5 * var)
         eps = torch.rand_like(std)
         return mu + eps * std
-    
+
     def forward(self, input_data):
         encoder_embeddings = self.encoder(input_data)
         mu = self.mu(encoder_embeddings)
         var = self.var(encoder_embeddings)
         z = self.reparameterization(mu, var)
         return self.decoder(z), mu, var, z
-        
+
+
 class Gaussian(nn.Module):
     def __init__(self, in_dim, z_dim):
         super(Gaussian, self).__init__()
@@ -193,39 +192,49 @@ class Gaussian(nn.Module):
         logvar = self.var(x)
         return mu.squeeze(2), logvar.squeeze(2)
 
+
 class GCNLatent(nn.Module):
     def __init__(self, x_dim, z_dim, nonLinear):
         super(GCNLatent, self).__init__()
-        
-        self.latentnet = torch.nn.ModuleList([
-            nn.Linear(x_dim, z_dim),
-            nonLinear,
-            nn.Linear(z_dim, z_dim),
-            nonLinear,
-            Gaussian(z_dim, 1)
-        ])
+
+        self.latentnet = torch.nn.ModuleList(
+            [
+                nn.Linear(x_dim, z_dim),
+                nonLinear,
+                nn.Linear(z_dim, z_dim),
+                nonLinear,
+                Gaussian(z_dim, 1),
+            ]
+        )
 
     def reparameterize(self, mu, var):
         std = torch.sqrt(var + 1e-10)
-        noise = torch.randn_like(std)#和vae好像还是不一样的？还是技巧，哪个好
-        z = mu + noise * std#为啥不是exp(std) 答：forward那块加了
+        noise = torch.randn_like(std)  # 和vae好像还是不一样的？还是技巧，哪个好
+        z = mu + noise * std  # 为啥不是exp(std) 答：forward那块加了
 
         return z
-    
+
     def latent(self, x):
 
         for layer in self.latentnet:
             x = layer(x)
         return x
 
-    def forward(self, x, ):
-       
+    def forward(
+        self,
+        x,
+    ):
+
         mu, logvar = self.latent(x.float())
         var = torch.exp(logvar)
         z = self.reparameterize(mu, var)
-        output = {'lmean'  : mu, 'lvar': var, 'lvalue': z,}
+        output = {
+            "lmean": mu,
+            "lvar": var,
+            "lvalue": z,
+        }
         return output
-    
+
 
 class MultiGraphGCN(nn.Module):
     def __init__(
@@ -242,7 +251,7 @@ class MultiGraphGCN(nn.Module):
         two_level_attention: bool,
         omics_shapes: Dict[str, Tuple[int]],
         device: torch.device,
-        learn_param: bool = True
+        learn_param: bool = True,
     ):
 
         super().__init__()
@@ -276,7 +285,7 @@ class MultiGraphGCN(nn.Module):
                 for rel, shape in self.omics_shapes.items()
             }
         )
-        
+
         # self.conv1 = nn.ModuleDict(
         # {
         #     rel: dglnn.GraphConv(shape[1], shape[1])
@@ -289,7 +298,7 @@ class MultiGraphGCN(nn.Module):
         #         for rel, shape in self.omics_shapes.items()
         #     }
         # )
-       
+
         if self.dataset in [
             DataEnum.BRCA_M.name,
             DataEnum.KIPAN.name,
@@ -337,47 +346,58 @@ class MultiGraphGCN(nn.Module):
             first_hop_att_embeddings,
             first_feature_attention,
         ) = self.attentionencoder(first_hop_embeddings)
-        if self.args.dataset not in [DataEnum.ADNI.name,
-                                     DataEnum.BRCA.name,
-                                     DataEnum.PRAD.name,
-                                     DataEnum.LIHC.name,
-                                     DataEnum.BLCA.name,
-                                    ]:
+        if self.args.dataset not in [
+            DataEnum.ADNI.name,
+            DataEnum.BRCA.name,
+            DataEnum.PRAD.name,
+            DataEnum.LIHC.name,
+            DataEnum.BLCA.name,
+        ]:
             first_hop_rev_embeddings = sort_data_order(
-                dataset=self.args.dataset, train_data=first_hop_embeddings, forwards=False
-                )
+                dataset=self.args.dataset,
+                train_data=first_hop_embeddings,
+                forwards=False,
+            )
             first_hop_rev_embeddings = self.correct_shape(first_hop_rev_embeddings)
-            (first_hop_att_embeddings_rev, 
-            first_omics_attention_rev, 
+            (
+                first_hop_att_embeddings_rev,
+                first_omics_attention_rev,
             ) = self.attentionencoder(first_hop_rev_embeddings)
-            first_con = {k: first_hop_embeddings[k] * first_hop_att_embeddings[k] 
-                        for k in first_hop_embeddings.keys()}
-            second_con = {k: first_hop_embeddings[k] * first_hop_att_embeddings_rev[k] 
-                        for k in first_hop_embeddings.keys()}
-            first_hop_att_embeddings = {k: first_con[k] + second_con[k] 
-                                    for k in first_con.keys()}
+            first_con = {
+                k: first_hop_embeddings[k] * first_hop_att_embeddings[k]
+                for k in first_hop_embeddings.keys()
+            }
+            second_con = {
+                k: first_hop_embeddings[k] * first_hop_att_embeddings_rev[k]
+                for k in first_hop_embeddings.keys()
+            }
+            first_hop_att_embeddings = {
+                k: first_con[k] + second_con[k] for k in first_con.keys()
+            }
 
         second_hop_embeddings = {
             etyoe: self.conv2[etyoe](graph[etyoe], first_hop_att_embeddings[etyoe])
             for etyoe in input_data.keys()
         }
         try:
-            return (second_hop_embeddings,
-                    first_feature_attention,
-                    first_omics_attention_rev, 
+            return (
+                second_hop_embeddings,
+                first_feature_attention,
+                first_omics_attention_rev,
             )
         except UnboundLocalError:
-            return (second_hop_embeddings,
-                    first_feature_attention,
-                    "first_omics_attention_rev", 
+            return (
+                second_hop_embeddings,
+                first_feature_attention,
+                "first_omics_attention_rev",
             )
 
     def forward(
         self, graph: DGLHeteroGraph, input_data: Dict[str, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Dict[str, torch.Tensor]]:
         (
-            second_hop_embeddings, 
-            first_feature_attention, 
+            second_hop_embeddings,
+            first_feature_attention,
             first_feature_attention_rev,
         ) = self.message_passings_embeddings(graph, input_data)
         if self.reverse_attention:
@@ -409,29 +429,37 @@ class MultiGraphGCN(nn.Module):
             logvars = defaultdict()
             embed = defaultdict()
             for key, value in second_hop_embeddings.items():
-                recons[key], mus[key], logvars[key], embed[key] = self.encoder_decoder[key](value)
+                recons[key], mus[key], logvars[key], embed[key] = self.encoder_decoder[
+                    key
+                ](value)
             if isinstance(recons, dict):
                 second_hop_embeddings = list(recons.values())
             elif isinstance(recons, Tensor):
                 second_hop_embeddings = list(recons)
-            out_embeddings = self.lin_transpose(torch.concat(second_hop_embeddings, dim=-1))
+            out_embeddings = self.lin_transpose(
+                torch.concat(second_hop_embeddings, dim=-1)
+            )
             return (
                 out_embeddings,
                 self.label_classifier(out_embeddings),
                 recons,
-                first_feature_attention, 
+                first_feature_attention,
                 first_feature_attention_rev,
-                mus, logvars, recons
+                mus,
+                logvars,
+                recons,
             )
         else:
             if isinstance(second_hop_embeddings, dict):
                 second_hop_embeddings = list(second_hop_embeddings.values())
             elif isinstance(second_hop_embeddings, Tensor):
                 second_hop_embeddings = list(second_hop_embeddings)
-            out_embeddings = self.lin_transpose(torch.concat(second_hop_embeddings, dim=-1))
+            out_embeddings = self.lin_transpose(
+                torch.concat(second_hop_embeddings, dim=-1)
+            )
             return (
                 out_embeddings,
-                self.label_classifier(out_embeddings), 
-                first_feature_attention, 
+                self.label_classifier(out_embeddings),
+                first_feature_attention,
                 first_feature_attention_rev,
             )

@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from enum_holder import DataEnum
 from main_1 import run_1
 from main_2 import run_2
@@ -33,20 +34,32 @@ if args.dataset in [
     DataEnum.PRAD.name,
     DataEnum.WT.name,
 ]:
-    run_2(args=args, file_path=file_path/ "data_for_complete_scenario", hyperparameters=hyperparameters)
+    run_2(
+        args=args,
+        file_path=file_path / "data_for_complete_scenario",
+        hyperparameters=hyperparameters,
+    )
 elif args.dataset in [
     DataEnum.ADNI.name,
     DataEnum.ROSMAP.name,
     DataEnum.TCGA_BRCA.name,
     DataEnum.TCGA_GBM.name,
 ]:
-    run_1(args=args, file_path=file_path/ "data_for_complete_scenario", hyperparameters=hyperparameters)
+    run_1(
+        args=args,
+        file_path=file_path / "data_for_complete_scenario",
+        hyperparameters=hyperparameters,
+    )
 elif args.dataset in [
     DataEnum.BRCA_M.name,
     DataEnum.KIPAN.name,
     DataEnum.ROSMAP_M.name,
     DataEnum.LGG.name,
 ]:
-    run_3(args=args, file_path=file_path/ "data_for_missing_scenario", hyperparameters=hyperparameters)
+    run_3(
+        args=args,
+        file_path=file_path / "data_for_missing_scenario",
+        hyperparameters=hyperparameters,
+    )
 else:
     raise ValueError

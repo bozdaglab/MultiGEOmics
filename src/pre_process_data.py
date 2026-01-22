@@ -1,22 +1,23 @@
+import os
 import pickle
 from collections import defaultdict
 from itertools import islice, product
 from pathlib import Path
 from typing import Dict, List, Optional, Union
-import os
+
 import dgl
-from numpy.random import randint
 import numpy as np
 import pandas as pd
 import scipy
 import torch
-from sklearn.preprocessing import OneHotEncoder
 import torch.nn.functional as F
 from dgl.data import DGLDataset
 from dgl.heterograph import DGLHeteroGraph
+from numpy.random import randint
 from scipy.stats import spearmanr
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 from sklearn.neighbors import NearestNeighbors, kneighbors_graph
+from sklearn.preprocessing import OneHotEncoder
 from torch_geometric.utils import from_scipy_sparse_matrix, to_scipy_sparse_matrix
 
 from enum_holder import DataEnum, SimilarityEnum
@@ -32,16 +33,16 @@ from model_config import (
     AML,
     BLCA,
     BRCA,
+    BRCA_M,
+    KIPAN,
+    LGG,
     LIHC,
     PRAD,
     ROSMAP,
+    ROSMAP_M,
     TCGA_BRCA,
     TCGA_GBM,
     WT,
-    BRCA_M,
-    ROSMAP_M,
-    KIPAN,
-    LGG
 )
 
 
@@ -93,15 +94,15 @@ class MultiOmicsData(DGLDataset):
                     gene_file_name=omic,
                     path=self.path / self.folder_name,
                     dataset=self.folder_name,
-                    labels=labels
+                    labels=labels,
                 )
                 for omic in self.omics_type
             }
-            
+
             train_test_data["label"] = torch.tensor(
                 [int(i[1]) for i in islice(labels, 1, None)]
             )
-        
+
         elif self.folder_name in [
             DataEnum.BRCA_M.name,
             DataEnum.KIPAN.name,
@@ -122,7 +123,7 @@ class MultiOmicsData(DGLDataset):
 
         if len([i for i in train_test_data if i.startswith(self.omics_type[0])]) > 1:
             train_test_data = self.combine_data(train_test_data)
-        if  "features" in train_test_data.keys():
+        if "features" in train_test_data.keys():
             train_test_data["features"] = {
                 key: data.columns.tolist()
                 for key, data in train_test_data.items()
@@ -183,11 +184,11 @@ class MultiOmicsData(DGLDataset):
         except AttributeError:
             for omic in self.omics_type:
                 self.graph.nodes["patient"].data[f"{omic}"] = (
-                    torch.from_numpy(train_test_data[f"{omic}"])
-                    .float()
-                    .to(self.device)
+                    torch.from_numpy(train_test_data[f"{omic}"]).float().to(self.device)
                 )
-                self.graph.label = torch.from_numpy(train_test_data["label"]).to(self.device)
+                self.graph.label = torch.from_numpy(train_test_data["label"]).to(
+                    self.device
+                )
         self.graph.shape = {
             key: val.shape
             for key, val in islice(train_test_data.items(), 0, len(train_test_data) - 1)
@@ -196,69 +197,71 @@ class MultiOmicsData(DGLDataset):
             key: val.shape
             for key, val in islice(train_test_data.items(), 0, len(train_test_data) - 1)
         }
-        
+
         self.graph.num_patients = train_test_data[
             list(train_test_data.keys())[0]
         ].shape[0]
         self.graph.num_class = len(torch.unique(self.graph.label))
-        
+
     def prepare_trte_data(self, path, cuda=True):
         omics_type = ["meth", "mirna", "expression"]
-        labels_tr = np.loadtxt(os.path.join(path, "labels_tr.csv"), delimiter=',')
-        labels_te = np.loadtxt(os.path.join(path, "labels_te.csv"), delimiter=',')
+        labels_tr = np.loadtxt(os.path.join(path, "labels_tr.csv"), delimiter=",")
+        labels_te = np.loadtxt(os.path.join(path, "labels_te.csv"), delimiter=",")
         labels_tr = labels_tr.astype(int)
         labels_te = labels_te.astype(int)
         data_tr_list = defaultdict()
         data_te_list = defaultdict()
 
         for i in omics_type:
-            data_tr_list[i] = np.loadtxt(os.path.join(path, str(i) + "_train.csv"), delimiter=',')
-            data_te_list[i] = np.loadtxt(os.path.join(path, str(i) + "_test.csv"), delimiter=',')
-            
+            data_tr_list[i] = np.loadtxt(
+                os.path.join(path, str(i) + "_train.csv"), delimiter=","
+            )
+            data_te_list[i] = np.loadtxt(
+                os.path.join(path, str(i) + "_test.csv"), delimiter=","
+            )
 
         eps = 1e-10
-        X_train_min = {k: np.min(v, axis=0, keepdims=True) for k, v in data_tr_list.items()}
+        X_train_min = {
+            k: np.min(v, axis=0, keepdims=True) for k, v in data_tr_list.items()
+        }
         data_tr_list = {
-                        k: v - np.tile(X_train_min[k], [v.shape[0], 1]) 
-                        for k, v in data_tr_list.items()
-                        }
-        
+            k: v - np.tile(X_train_min[k], [v.shape[0], 1])
+            for k, v in data_tr_list.items()
+        }
+
         data_te_list = {
-                        k: data_te_list[k] - np.tile(X_train_min[k], [data_te_list[k].shape[0], 1]) 
-                        for k, v in data_tr_list.items()
-                        }  
-        
-        
+            k: data_te_list[k] - np.tile(X_train_min[k], [data_te_list[k].shape[0], 1])
+            for k, v in data_tr_list.items()
+        }
+
         X_train_max = {
-                    k: np.max(v, axis=0, keepdims=True) + eps 
-                    for k, v in data_tr_list.items()
-                    }
-        
-        
+            k: np.max(v, axis=0, keepdims=True) + eps for k, v in data_tr_list.items()
+        }
+
         data_tr_list = {
-                        k: v / np.tile(X_train_max[k], [v.shape[0], 1]) 
-                        for k, v in data_tr_list.items()
-                    }
-        
-        
-        data_te_list = {k: data_te_list[k] / np.tile(X_train_max[k], [data_te_list[k].shape[0], 1]) 
-                        for k, v in data_tr_list.items()
-                        }
+            k: v / np.tile(X_train_max[k], [v.shape[0], 1])
+            for k, v in data_tr_list.items()
+        }
+
+        data_te_list = {
+            k: data_te_list[k] / np.tile(X_train_max[k], [data_te_list[k].shape[0], 1])
+            for k, v in data_tr_list.items()
+        }
 
         num_tr = data_tr_list["meth"].shape[0]
         num_te = data_te_list["meth"].shape[0]
         train_test_data = defaultdict()
         for i in omics_type:
-            train_test_data[i] = np.concatenate((data_tr_list[i], data_te_list[i]), axis=0)
-            
+            train_test_data[i] = np.concatenate(
+                (data_tr_list[i], data_te_list[i]), axis=0
+            )
 
         idx_dict = defaultdict()
         idx_dict["tr"] = list(range(num_tr))
         idx_dict["te"] = list(range(num_tr, (num_tr + num_te)))
         train_test_data["label"] = np.concatenate((labels_tr, labels_te))
-        train_test_data['idx_dict'] = idx_dict
+        train_test_data["idx_dict"] = idx_dict
         return train_test_data
-
 
     def save(self) -> DGLHeteroGraph:
         with open(self.path_to_save, "wb") as file:
@@ -309,6 +312,7 @@ def define_dataset(folder_name: str) -> List[str]:
     else:
         raise ValueError
     return omics_type
+
 
 def create_mrr_dataset(folder_name):
     data_name = define_dataset(folder_name)
@@ -435,8 +439,6 @@ def define_graph(similarity_type: str, data: pd.DataFrame) -> torch.Tensor:
     return similarity_matrix
 
 
-
-
 def get_mask_wrapper(n_views, data_len, missing_rate):
     success = False
     while not success:
@@ -445,12 +447,13 @@ def get_mask_wrapper(n_views, data_len, missing_rate):
             success = True
         except:
             success = False
-    
+
     return mask
+
 
 def one_hot_tensor(y, num_dim):
     y_onehot = torch.zeros(y.shape[0], num_dim)
-    y_onehot.scatter_(1, y.view(-1,1), 1)
+    y_onehot.scatter_(1, y.view(-1, 1), 1)
     return y_onehot
 
 
@@ -470,46 +473,59 @@ def get_mask(view_num, alldata_len, missing_rate):
         one_rate = 1.0 - missing_rate
         if one_rate <= (1 / view_num):
             enc = OneHotEncoder()  # n_values=view_num
-            view_preserve = enc.fit_transform(randint(0, view_num, size=(alldata_len, 1))).toarray()
+            view_preserve = enc.fit_transform(
+                randint(0, view_num, size=(alldata_len, 1))
+            ).toarray()
             full_matrix = np.concatenate([view_preserve, full_matrix], axis=0)
-            choice = np.random.choice(full_matrix.shape[0], size=full_matrix.shape[0], replace=False)
+            choice = np.random.choice(
+                full_matrix.shape[0], size=full_matrix.shape[0], replace=False
+            )
             matrix = full_matrix[choice]
             return matrix
         error = 1
         if one_rate == 1:
             matrix = randint(1, 2, size=(alldata_len, view_num))
             full_matrix = np.concatenate([matrix, full_matrix], axis=0)
-            choice = np.random.choice(full_matrix.shape[0], size=full_matrix.shape[0], replace=False)
+            choice = np.random.choice(
+                full_matrix.shape[0], size=full_matrix.shape[0], replace=False
+            )
             matrix = full_matrix[choice]
             return matrix
         while error >= 0.05:
             enc = OneHotEncoder()  # n_values=view_num
-            view_preserve = enc.fit_transform(randint(0, view_num, size=(alldata_len, 1))).toarray()
+            view_preserve = enc.fit_transform(
+                randint(0, view_num, size=(alldata_len, 1))
+            ).toarray()
             one_num = view_num * alldata_len * one_rate - alldata_len
             ratio = one_num / (view_num * alldata_len)
-            matrix_iter = (randint(0, 100, size=(alldata_len, view_num)) < int(ratio * 100)).astype(int)
+            matrix_iter = (
+                randint(0, 100, size=(alldata_len, view_num)) < int(ratio * 100)
+            ).astype(int)
             a = np.sum(((matrix_iter + view_preserve) > 1).astype(int))
             one_num_iter = one_num / (1 - a / one_num)
             ratio = one_num_iter / (view_num * alldata_len)
-            matrix_iter = (randint(0, 100, size=(alldata_len, view_num)) < int(ratio * 100)).astype(int)
+            matrix_iter = (
+                randint(0, 100, size=(alldata_len, view_num)) < int(ratio * 100)
+            ).astype(int)
             matrix = ((matrix_iter + view_preserve) > 0).astype(int)
             ratio = np.sum(matrix) / (view_num * alldata_len)
             error = abs(one_rate - ratio)
         full_matrix = np.concatenate([matrix, full_matrix], axis=0)
 
-    choice = np.random.choice(full_matrix.shape[0], size=full_matrix.shape[0], replace=False)
+    choice = np.random.choice(
+        full_matrix.shape[0], size=full_matrix.shape[0], replace=False
+    )
     matrix = full_matrix[choice]
     return matrix
 
 
 def str2bool(string):
-    """ Convert string to corresponding boolean.
-        -  string : str
+    """Convert string to corresponding boolean.
+    -  string : str
     """
-    if string in ["True","true","1"]:
+    if string in ["True", "true", "1"]:
         return True
-    elif string in ["False","false","0"]:
+    elif string in ["False", "false", "0"]:
         return False
-    else :
+    else:
         return False
-            
